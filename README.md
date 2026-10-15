@@ -1,152 +1,70 @@
 # UI Forge
 
-A standalone desktop app for designing coordinated HUDs for Godot games. Built
-in Godot, with local template generation and editable native Control exports.
+Create health bars, mana bars, minimaps, weapon displays, and other HUD elements
+for your Godot game. Choose a game type and visual style, preview three layouts,
+then export an editable Godot scene and theme.
 
 ![UI Forge desktop](docs/screenshot.png)
 
-## Run
+## Start here
 
-Use **Godot 4.6+** (tested with 4.6.3). Open `project.godot` in Godot and press
-**F6** on `scenes/main.tscn`, or **F5** to run the project. The app runs in its
-own window; it is not an editor plugin. From a terminal:
-
-```sh
-godot --editor --path . --import --quit
-godot --path .
-```
-
-No package installation, backend, account, network access, or API key is needed.
-The desktop requires OpenGL 3.3 support. The minimum window size is 1120 × 900.
-
-For the **portable Windows build**, extract `build/UIForge-windows-x86_64.zip`,
-open the `UIForge` folder, and double-click `UIForge.exe`. Keep `UIForge.pck`
-beside it. No separate Godot installation is needed to run this package.
-
-## Create a HUD
-
-1. Click **New UI**, or start with the initial FPS design.
-2. Choose FPS, RPG, RTS, Racing, Survival, or Platformer. Each genre selects a
-   useful starting set of components; change them with the checkboxes.
-3. Choose Military, Fantasy, Modern, Horror, Sci-fi, or Minimal.
-4. Choose a 16:9 target resolution, then click **Generate 3 variations**.
-5. Click a variation's image or name to preview the Balanced, Compact, or
-   Cinematic layout. Change the accent color, HUD size, and health/mana values.
-6. Click **Export to Godot** and choose a parent directory. A new, uniquely
-   named folder is created; existing exports are never overwritten.
-
-Supported components: health, mana, armor, minimap, weapon/ammo, crosshair,
-ability slots, objectives, speedometer, laps, resources, and squad/selection.
-`Ctrl+G` generates and `Ctrl+E` opens export (`Cmd` on macOS).
-
-Changing the brief requires Generate to apply. Accent, size, health, and mana
-update the current design immediately. Export always uses the visible design.
-Generate resets customizations to the selected style's defaults. New UI resets
-the whole brief. Designs are held in memory; export before closing.
-
-## Use the export in your game
-
-The generated folder contains:
-
-| File | Purpose |
+| What you want to do | Follow this guide |
 | --- | --- |
-| `hud.tscn` | Editable Godot Control scene, with no app scripts |
-| `hud_theme.tres` | Shared panel, label, and progress bar styles |
-| `preset.json` | Design settings and example values for reference |
-| `README.md` | Integration instructions and node paths |
+| Run the desktop app on Windows | [Windows: download, extract, launch, and create your first HUD](docs/windows-guide.md) |
+| Run UI Forge using the Godot editor | [Godot: open the source project and press Play](docs/godot-guide.md#run-ui-forge-from-source) |
+| Add a generated HUD to your own game | [Godot: import the HUD and connect health to gameplay](docs/godot-guide.md#add-an-exported-hud-to-your-game) |
+| Test the code or build a Windows ZIP yourself | [Development and packaging](docs/development.md) |
 
-Copy the **whole folder** into your game's project. Instance `hud.tscn` below a
-`CanvasLayer`. Enable Editable Children in the Godot editor to adjust individual
-controls. The scene uses a transparent, uniformly scaled 1280 × 720 design canvas;
-other aspect ratios letterbox the HUD. The target resolution is recorded in the
-preset and guide; configure the actual game window size in your game project.
+## Run on Windows
 
-The preview environment is not exported. Minimap geometry, ammo, timers, and
-ability slots are examples. Supply your gameplay data and behavior. For example,
-with the Health component selected and the exported HUD below `CanvasLayer`:
+1. Open [GitHub Releases](https://github.com/Ruslanf89/UI_Generator/releases).
+2. Under a release's **Assets**, download `UIForge-windows-x86_64.zip` when available.
+3. In Windows File Explorer, right-click the ZIP and choose **Extract All…**.
+4. Open the extracted folder, then its `UIForge` folder.
+5. Double-click **UIForge.exe**. Keep `UIForge.pck` beside the executable.
 
-```gdscript
-@onready var health_bar: ProgressBar = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Value
-@onready var health_text: Label = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Amount
+The packaged app includes its runtime. You do not need to install Godot, Python,
+or Git to run it. It runs locally without an account or API key.
 
-func update_health(current: float, maximum: float) -> void:
-    health_bar.max_value = maximum
-    health_bar.value = current
-    health_text.text = "%d / %d" % [current, maximum]
-```
+**If there is no Windows ZIP under Assets**, follow the
+[Godot source-project instructions](docs/godot-guide.md#run-ui-forge-from-source).
+GitHub's **Source code (zip)** and **Code → Download ZIP** downloads contain the
+project rather than a ready-to-run Windows executable.
 
-This first version generates layouts from curated templates. It does not
-generate AI artwork, store editable projects, import exported presets, or supply
-game logic. All visuals use native controls; no external artwork is required.
+## Create and export your first HUD
 
-## Validate
+1. Click **New UI**. Choose a game type, such as **FPS**.
+2. Choose a visual style, such as **Military**.
+3. Tick the components you want. Scroll the component list to see all options.
+4. Choose a target resolution and click **Generate 3 variations**.
+5. Click a variation's thumbnail or name. Change the accent color and HUD size
+   on the right. Health and mana sliders preview the selected bars.
+6. Click **Export to Godot** and select an existing folder to save into.
 
-```sh
-godot --headless --editor --path . --import --quit
-godot --headless --path . --script tests/run_tests.gd
-godot --headless --path . --quit-after 6
-```
+The app creates a new folder containing `hud.tscn`, `hud_theme.tres`,
+`preset.json`, and a `README.md` integration guide. Copy the **whole folder** into
+your game's Godot project, then follow the
+[step-by-step Godot import guide](docs/godot-guide.md#add-an-exported-hud-to-your-game).
 
-The test suite covers all 108 genre/style/layout combinations, layout bounds and
-overlaps at the supported scale limits, editor interactions, invalid and repeated
-exports, and loading a customized export in a separate Godot project. It exits
-nonzero on failure. Temporary export fixtures are written to the OS temp directory.
-Headless checks do not validate a physical desktop or GPU.
+## What this version provides
 
-In a cloud shell with a read-only home directory, initialize writable runtime
-locations before Godot commands:
+- Six game types: FPS, RPG, RTS, Racing, Survival, and Platformer.
+- Six styles: Military, Fantasy, Modern, Horror, Sci-fi, and Minimal.
+- Twelve optional HUD components and three coordinated layout variations.
+- Editable native Godot controls and a shared theme, with no generator plugin
+  required in your game.
 
-```sh
-mkdir -p /tmp/ui-generator-godot/{cache,data,config}
-export XDG_CACHE_HOME=/tmp/ui-generator-godot/cache
-export XDG_DATA_HOME=/tmp/ui-generator-godot/data
-export XDG_CONFIG_HOME=/tmp/ui-generator-godot/config
-```
+Generation uses local templates. The map, ammo, timers, and ability slots use
+example data; connect them to your game logic. The preview background is not
+included in the exported HUD.
 
-## Package a standalone app
+Designs are held in memory. **Export before closing the app or clicking New UI.**
+Changing the brief requires Generate to apply; Generate resets the current
+color, size, and sample-value customizations. Existing exports are kept in
+separate folders. Loading exported presets back into the designer is not
+implemented.
 
-Windows x64 is the primary downloadable target. To create its portable
-development ZIP with Python 3.10+ and Godot 4.6.3:
-
-```sh
-python3 scripts/package_windows.py
-```
-
-The script downloads the official Godot Windows engine over HTTPS, verifies
-its pinned published SHA-512 checksum, exports the app with Windows settings,
-and creates `build/UIForge-windows-x86_64.zip`. The ZIP includes the executable,
-companion PCK, instructions, SHA-256 checksums, and engine license notices.
-It uses the full engine; a production export with official templates is smaller.
-Packaging, archive integrity, and the resource pack are checked on Linux;
-execution on Windows remains unvalidated. Rebuild after changing the app.
-
-To use an existing official runtime archive or a custom local Godot executable:
-
-```sh
-python3 scripts/package_windows.py --runtime-zip /path/to/Godot_v4.6.3-stable_win64.exe.zip --godot /path/to/godot
-```
-
-Export presets are included for Linux x86_64 and Windows x86_64. Install the
-matching official Godot export templates through **Editor → Manage Export
-Templates**, then use **Project → Export** or:
-
-```sh
-mkdir -p build
-godot --headless --path . --export-release Linux build/UIForge.x86_64
-godot --headless --path . --export-release Windows build/UIForge.exe
-```
-
-Windows packaging is configured but has not been validated on Windows. For
-macOS, add a macOS preset in Godot and configure signing for distribution.
-
-A standalone Linux **development** package can also use the installed Godot
-executable without downloading export templates:
-
-```sh
-bash scripts/package_linux.sh
-```
-
-This creates `build/UIForge-linux-x86_64.tar.gz`. Extract it and run
-`linux/UIForge.x86_64`. Keep the `.pck` beside the executable. This bundle includes
-the full Godot engine and its license notices; a template-based release is smaller.
-Build outputs are ignored by Git. Godot engine notices are in `licenses/godot`.
+The app and exports target **Godot 4.6+**, tested with **4.6.3**. The packaged
+desktop targets Windows x64 with OpenGL 3.3-compatible graphics and needs space
+for a **1120 × 900** window. Packaging and application checks ran on Linux;
+native Windows execution remains untested.

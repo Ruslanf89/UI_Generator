@@ -120,6 +120,7 @@ func _test_export() -> void:
 	for filename in ["hud.tscn", "hud_theme.tres"]:
 		DirAccess.copy_absolute(result.path.path_join(filename), game.path_join("hud/" + filename))
 	_write(game.path_join("project.godot"), "config_version=5\n[application]\nconfig/name=\"Export Test\"\n[rendering]\nrenderer/rendering_method=\"gl_compatibility\"\n")
+	DirAccess.copy_absolute(ProjectSettings.globalize_path("res://docs/examples/health_demo.gd"), game.path_join("health_demo.gd"))
 	_write(game.path_join("verify.gd"), """extends SceneTree
 func _initialize():
     call_deferred("verify")
@@ -142,12 +143,42 @@ func verify():
     if elements.get_node("Health/Value").value != 12:
         quit(4)
         return
+    var demo = Node2D.new()
+    demo.set_script(load("res://health_demo.gd"))
+    var layer = CanvasLayer.new()
+    layer.name = "CanvasLayer"
+    demo.add_child(layer)
+    layer.add_child(packed.instantiate())
+    root.add_child(demo)
+    await process_frame
+    if demo.health_bar.value != 100 or demo.health_text.text != "100 / 100":
+        quit(5)
+        return
+    var key = InputEventKey.new()
+    key.pressed = true
+    key.keycode = KEY_SPACE
+    demo._unhandled_key_input(key)
+    if demo.health_bar.value != 90 or demo.health_text.text != "90 / 100":
+        quit(6)
+        return
+    for i in range(20):
+        demo._unhandled_key_input(key)
+    if demo.health_bar.value != 0 or demo.health_text.text != "0 / 100":
+        quit(7)
+        return
+    key.keycode = KEY_R
+    demo._unhandled_key_input(key)
+    if demo.health_bar.value != 100 or demo.health_text.text != "100 / 100":
+        quit(8)
+        return
+    print("HEALTH_DEMO_OK")
     print("INDEPENDENT_EXPORT_OK")
     quit(0)
 """)
 	var output: Array = []
 	var exit_code = OS.execute(OS.get_executable_path(), ["--headless", "--path", game, "--script", "verify.gd"], output, true)
 	check(exit_code == 0 and str(output).contains("INDEPENDENT_EXPORT_OK") and not str(output).contains("ERROR:"), "Export loads, retains values, and works in a separate Godot project: " + str(output))
+	check(str(output).contains("HEALTH_DEMO_OK"), "Documented health demo initializes, takes damage, clamps to zero, and heals")
 
 func _write(path: String, text: String) -> void:
 	var file = FileAccess.open(path, FileAccess.WRITE)

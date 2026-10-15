@@ -103,24 +103,64 @@ static func _instructions(config: Dictionary, variant: int) -> String:
 
 %s / %s / %s
 
-Requires Godot 4.6 or newer. Copy this entire folder into your game's project,
-then instance hud.tscn under a CanvasLayer in your game scene. Keep hud_theme.tres
-beside hud.tscn. No generator scripts, plugins, external art, or network access
-are required. These are native editable Godot Control nodes.
+## Add this HUD to your game
+
+Use Godot 4.6 or newer (tested with 4.6.3). This folder is an exported HUD,
+not the UI Forge desktop application. It contains native editable Control nodes.
+
+1. Open your game's project in the Godot editor.
+2. In its FileSystem dock, right-click res:// and choose Open in File Manager.
+   This opens the game folder containing your game's project.godot.
+3. Create a ui folder there, then copy this entire exported folder into it.
+   Keep hud.tscn and hud_theme.tres beside each other.
+4. Return to Godot and wait for the new files to appear.
+5. Open your gameplay scene. Select its root and add a CanvasLayer child.
+6. Drag this folder's hud.tscn from FileSystem onto CanvasLayer in the Scene dock.
+7. Keep the new instance named HUD, save the game scene, and press F6 to run it.
+
+Your scene should contain:
+
+```text
+Game
+  CanvasLayer
+    HUD
+```
+
+CanvasLayer keeps the interface in screen space. The HUD is transparent;
+UI Forge's preview background is not exported. No generator plugins or scripts
+are needed in your game to display this scene.
+
+## Window size and editing
 
 The HUD uses a transparent 1280 x 720 design canvas, scaled uniformly within
 the game viewport. Non-16:9 viewports letterbox the HUD to avoid distortion.
 Your chosen target resolution is %d x %d; set your game window size there.
 
-In the editor, enable Editable Children to customize individual controls.
-Gameplay values, the map, timers, and ability slots contain example data;
-connect them to your game's state. This export contains no gameplay logic.
+Set the game window under Project > Project Settings > Display > Window.
+The recorded target resolution does not change those settings automatically.
 
-For a health component, a script on your game scene can use:
+Right-click the HUD instance in the Scene dock and enable Editable Children.
+Its controls are below Canvas > Viewport > Design > Elements. Edit their text,
+position, or Theme Overrides in the Inspector. The Elements node uses the shared
+hud_theme.tres resource; changing that theme affects controls that use it.
+
+## Connect gameplay values
+
+The map, ammo, health, timers, and ability slots contain example data. Your game
+must update the controls; the export does not include gameplay logic.
+
+If Health was selected, attach a GDScript to your Node2D Game root to initialize
+its health display. For a Node3D root, change extends to Node3D. If your game
+already has a script, integrate the relevant code instead of replacing it.
 
 ```gdscript
+extends Node2D
+
 @onready var health_bar: ProgressBar = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Value
 @onready var health_text: Label = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Amount
+
+func _ready() -> void:
+    update_health(100.0, 100.0)
 
 func update_health(current: float, maximum: float) -> void:
     health_bar.max_value = maximum
@@ -128,11 +168,20 @@ func update_health(current: float, maximum: float) -> void:
     health_text.text = "%%d / %%d" %% [current, maximum]
 ```
 
+Run the game scene with F6: this example should show 100 / 100. Call update_health
+after damage or healing in your real game. If you get Node not found, check that
+Health was selected and that the node names and script placement match the tree.
+
 Other elements live below the same Elements node: Mana/Value, Armor/Value,
 Weapon/Ammo, Weapon/Reserve, Minimap/MapContent, Objective/Description,
 Speed/Value, Lap/Time, Resources/Values, Squad and Abilities/Slot1..Slot4.
 Only components you selected are present. Replace the minimap sample blocks
 with a camera or real map, and connect the remaining controls as needed.
 
-preset.json records the design choices for reference.
+preset.json records the design choices; importing it back into UI Forge is not
+implemented. You can keep editing the exported scene and theme in Godot.
+
+Full illustrated guides, a Space-to-damage / R-to-heal example, and troubleshooting:
+https://github.com/Ruslanf89/UI_Generator/blob/main/docs/godot-guide.md
+https://github.com/Ruslanf89/UI_Generator/blob/main/docs/windows-guide.md
 """ % [config.genre, config.style, Generator.LAYOUTS[variant], config.resolution.x, config.resolution.y]
