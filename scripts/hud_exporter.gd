@@ -1,8 +1,11 @@
 extends RefCounted
 
 const Generator = preload("res://scripts/hud_generator.gd")
+const KitExporter = preload("res://scripts/kit_exporter.gd")
 
 static func export_hud(config: Dictionary, variant: int, parent_directory: String) -> Dictionary:
+	if config.get("mode", "hud") == "kit":
+		return KitExporter.export_kit(config, variant, parent_directory)
 	if not DirAccess.dir_exists_absolute(parent_directory):
 		return {"ok": false, "error": "Choose an existing, writable export folder."}
 	var slug = "%s_%s_%s" % [config.genre.to_lower(), config.style.to_lower().replace("-", ""), Generator.LAYOUTS[variant].to_lower()]

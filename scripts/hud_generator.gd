@@ -1,6 +1,7 @@
 extends RefCounted
 ## Creates native, editable Godot controls. Generated scenes depend on no scripts.
 const Art = preload("res://scripts/hud_art.gd")
+const Kit = preload("res://scripts/kit_generator.gd")
 
 const GENRES = ["FPS", "RPG", "RTS", "Racing", "Survival", "Platformer"]
 const STYLES = ["Military", "Fantasy", "Modern", "Horror", "Sci-fi", "Minimal"]
@@ -113,6 +114,8 @@ static func component(root: Control, node_name: String, at: Vector2, dimensions:
 	return result
 
 static func build(config: Dictionary, variant: int = 0) -> Control:
+	if config.get("mode", "hud") == "kit":
+		return Kit.build(config, variant)
 	var root = Control.new()
 	root.name = "HUD"
 	root.size = CANVAS

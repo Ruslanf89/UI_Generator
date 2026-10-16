@@ -59,6 +59,19 @@ Changing genre, style, components, or resolution requires Generate to apply.
 Generate resets color, size, sample values, component positions/scales, and artwork. Apply those
 customizations after generating. Export always uses the visible design.
 
+CREATE A COMPLETE FANTASY KIT
+1. In the Design Brief dropdown, choose Fantasy UI kit.
+2. Choose Illustrated fantasy or Medieval pixel, a material, and decoration amount.
+3. Click Generate complete kit. Menu, HUD, and Components are matching pages.
+4. Select a piece in the large preview and click Regenerate selected on the right
+   to change only its artwork. Positions, sizes, and other pieces are kept.
+   Ctrl+Z undoes regeneration. Accent color applies across the kit.
+5. Export to Godot saves all three scenes, kit_theme.tres, art PNGs, and a guide.
+   Copy the entire export folder into your game. Use menu.tscn for the menu,
+   hud.tscn for gameplay, and components.tscn as a library to copy controls from.
+   Buttons have hover/pressed/disabled/focus states; connect actions in your game.
+All artwork is procedural and works offline without an account or API key.
+
 EXPORT AND USE IN GODOT
 1. Create a folder in Documents, for example UIForgeExports.
 2. Click Export to Godot and select that existing folder.
@@ -182,7 +195,7 @@ def main() -> int:
         (package / "README.txt").write_text(GUIDE, encoding="utf-8")
         guides = (
             "README.md", "docs/windows-guide.md", "docs/godot-guide.md",
-            "docs/development.md", "docs/examples/health_demo.gd", "docs/screenshot.png", "docs/materials.png",
+            "docs/development.md", "docs/examples/health_demo.gd", "docs/screenshot.png", "docs/materials.png", "docs/fantasy-kits.png",
         )
         for relative in guides:
             destination = package / relative

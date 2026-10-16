@@ -1,13 +1,15 @@
 # Godot user guide
 
 Use this guide to **run UI Forge from its source project**, or to **add an
-exported HUD to your own game**. Run the designer in the UI Forge project,
-and add its exported HUD files to your game project.
+exported HUD or fantasy kit to your own game**. Run the designer in the UI Forge
+project, and add its exported files to your game project.
 
 - [Run UI Forge from source](#run-ui-forge-from-source)
 - [Add an exported HUD to your game](#add-an-exported-hud-to-your-game)
+- [Add an exported fantasy kit to your game](#add-an-exported-fantasy-kit-to-your-game)
 - [Connect a health bar and test it](#connect-a-health-bar-and-test-it)
 - [Customize the scene in Godot](#customize-the-scene-in-godot)
+- [Edit the UI Forge designer itself](#edit-the-ui-forge-designer-itself)
 - [Troubleshooting](#troubleshooting)
 
 [Back to the project home page](../README.md)
@@ -61,8 +63,9 @@ to choose a main scene, select that file. You can also open it in the FileSystem
 dock and press **F6** to run only that scene.
 
 Follow [Create a first FPS HUD](windows-guide.md#5-create-a-first-fps-hud), then
-export your design. Running the designer does not automatically add a HUD to
-a different game project.
+export your design, or choose [Create a fantasy UI kit](windows-guide.md#create-a-fantasy-ui-kit).
+Running the designer does not automatically add controls to a different game
+project.
 
 ## Add an exported HUD to your game
 
@@ -148,10 +151,128 @@ an empty folder and the Compatibility renderer, then open the project. Choose
 export into this project and follow the CanvasLayer steps above. Press F6 for
 the test scene; F5 may ask you to select it as the main scene.
 
+## Add an exported fantasy kit to your game
+
+### 1. Generate and export the kit
+
+In UI Forge, select **Fantasy UI kit** at the top of **Design Brief**. Choose
+**Illustrated fantasy** or **Medieval pixel**, a material and decoration level,
+then click **Generate complete kit**. Arrange components on the **Menu**,
+**HUD**, and **Components** pages. Select a piece and use **Regenerate selected**
+to change only its artwork; **Ctrl+Z** restores the previous version.
+
+Click **Export to Godot** and choose an existing writable folder. Every export
+contains all three pages, regardless of the page visible in the designer:
+
+```text
+uiforge_kit_illustrated_fantasy/
+  menu.tscn
+  hud.tscn
+  components.tscn
+  kit_theme.tres
+  art/
+    ...generated PNGs...
+  preset.json
+  README.md
+```
+
+### 2. Copy and use the scenes
+
+1. Open your game's Godot project and use **FileSystem → right-click res:// →
+   Open in File Manager** to find its folder.
+2. Create a `ui` folder in your game and copy the **entire exported kit folder**
+   into it. Keep the three scenes, shared theme, and complete `art/` folder
+   together. Wait for Godot to finish importing the PNGs.
+3. For a gameplay overlay, open your game scene, add a **CanvasLayer**, and
+   drag the kit's **hud.tscn** onto it. The instance is named **HUD**, and the
+   health example below uses the same paths for both HUD and kit exports.
+4. For the menu, double-click **menu.tscn** in the FileSystem dock to inspect
+   it. Press **F6** to run the menu by itself, or instance it under a CanvasLayer
+   in your own menu scene.
+5. Open **components.tscn** to inspect the matching buttons, inventory sample,
+   panels, bars, and icons. Duplicate the controls you need into your own scenes;
+   keep their theme and image resources accessible.
+
+These are native Godot Control scenes. They need no UI Forge scripts, plugin,
+or connection to the generator. The preview scenery is not exported. Each
+page retains the positions and sizes you set in the designer.
+
+### 3. Edit labels and connect menu buttons
+
+Open `menu.tscn` directly to edit the exported scene, or right-click its instance
+in another scene and enable **Editable Children**. Expand:
+
+```text
+Menu
+  Canvas
+    Viewport
+      Design
+        Elements
+          TitleBanner
+            Title
+            Subtitle
+          MenuPanel
+          ContinueButton
+          NewJourneyButton
+          SettingsButton
+          ExitButton
+          CharacterPanel
+```
+
+Select a Button and edit its **Text** in the Inspector, or select a Label such
+as `TitleBanner/Title`. Buttons already have normal, hover, pressed, disabled,
+and focus artwork. The designer uses clicks to select and arrange controls;
+run the exported menu to try its interactive states.
+
+Menu actions are left to your game. For a simple exit-button test:
+
+1. Open the exported **menu.tscn** and attach a GDScript to its **Menu** root.
+2. Select **ExitButton** under `Canvas/Viewport/Design/Elements`.
+3. In the **Node → Signals** dock, double-click **pressed()**.
+4. Choose **Menu** as the receiver and click **Connect**.
+5. Replace the generated function's `pass` with `get_tree().quit()`.
+6. Save the script/scene, press **F6**, and click **Exit game**. This stops the
+   test menu.
+
+Use the same signal workflow to connect Continue, New journey, Settings, and
+ability buttons to your game code. Inventory items, currency, quests, and
+minimap landmarks are samples; the kit does not provide save data, inventory
+behavior, or a quest system.
+
+### 4. Change the kit artwork
+
+`kit_theme.tres` supplies shared fonts and colors. Individual controls have
+**Theme Overrides** containing their generated artwork:
+
+| Control | Where its artwork lives |
+| --- | --- |
+| Panel or banner | **Theme Overrides → Styles → Panel**, a StyleBoxTexture |
+| Button | **Theme Overrides → Styles**, with normal/hover/pressed/disabled/focus StyleBoxTexture resources |
+| Health or mana ProgressBar | **Theme Overrides → Styles → Background / Fill** |
+| Icon | A TextureRect's **Texture** property |
+
+Expand a StyleBoxTexture to inspect or replace its texture. Keep every PNG in
+`art/`: some are only shown during button interaction. Changing a PNG outside
+Godot updates the controls that reference it after reimport. Labels, button
+text, and ProgressBar values stay editable independently of the artwork.
+
+All pages use a transparent **1280 × 720** design canvas with uniform scaling.
+**Medieval pixel** preserves nearest filtering for images. Fractional scaling
+can make pixels uneven; use whole-number viewport scaling when a strict pixel
+grid is important for your game. The selected target resolution is recorded in
+the export; it does not change your game's Project Settings.
+
+`preset.json` records the kit seed, material, decoration, individual component
+seeds, positions, and scales. It is a record of the design; importing it back
+into UI Forge is not implemented. Export before generating a new kit or closing
+the designer. Subsequent exports create separate folders and do not merge
+your Godot scene edits.
+
 ## Connect a health bar and test it
 
 Your game must update both the ProgressBar and its number Label. This example
 starts at 100 health, removes 10 when you press Space, and restores health with R.
+It works with `hud.tscn` from either a HUD layout export or a fantasy kit export.
 
 ### 1. Attach a script
 
@@ -278,7 +399,39 @@ already customized in Godot.
 | Node2D script incompatibility | Use the Node2D test scene, or change `extends` to match your actual root type. |
 | No background in the exported HUD | The HUD is transparent. Add it to your game scene to see the game behind it. |
 | A theme edit has no effect on an element | Inspect that control's Theme Overrides. |
+| A kit button has no game action | Connect its native `pressed` signal to a script in your game. The exported scenes include styling and sample text, not menu/gameplay logic. |
+| Kit button hover/pressed art is missing | Copy the entire `art/` folder, including PNGs that are not visible in the normal state. |
+| Medieval pixel artwork looks uneven at some window sizes | Keep nearest filtering and use whole-number game viewport scaling for a consistent pixel grid. |
 | Different placement at another aspect ratio | The design preserves 16:9. Adjust viewport settings or edit the layout for your target ratio. |
 
-For designer code changes or building an executable, see
-[Development and packaging](development.md).
+## Edit the UI Forge designer itself
+
+Use the **UI Forge source project**, rather than an exported kit or the packaged
+EXE. Stop the running app with **F8** before editing its code.
+
+The window is built in GDScript when the app runs. `scenes/main.tscn` contains
+the root Control; most of the visible window will not appear as editable nodes
+in Godot's 2D editor before running it.
+
+1. In Godot's FileSystem dock, open **scripts/app.gd**.
+2. Find `_sidebar()` to edit the left design controls, `_inspector()` for the
+   right panel, `_center()` for previews, or `_header()` for the top bar.
+3. Change a label, control, or layout value, then save with **Ctrl+S**.
+4. Press **F5** to rebuild the window and test your change. Stop with **F8**
+   before editing again. Export a design you want to keep before stopping.
+
+| What you want to change | Source file |
+| --- | --- |
+| Designer window, controls, and actions | `scripts/app.gd` |
+| Preview rendering, mouse selection, dragging, and resizing | `scripts/hud_preview.gd` |
+| Fantasy kit scenes and native control layout | `scripts/kit_generator.gd` |
+| Fantasy kit procedural shapes, surfaces, ornaments, and icons | `scripts/kit_art.gd` |
+| Fantasy kit scene/theme/PNG export | `scripts/kit_exporter.gd` |
+| Original HUD component layouts and themes | `scripts/hud_generator.gd` |
+| Original HUD material textures and frames | `scripts/hud_art.gd` |
+| Original HUD export | `scripts/hud_exporter.gd` |
+
+Source changes affect the designer the next time it runs. They do not update
+previous exports or an already packaged executable. Re-export a design to get
+new generated controls, or rebuild the standalone app after source changes.
+For checks and executable builds, see [Development and packaging](development.md).

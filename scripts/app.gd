@@ -4,6 +4,7 @@ const Generator = preload("res://scripts/hud_generator.gd")
 const Exporter = preload("res://scripts/hud_exporter.gd")
 const Preview = preload("res://scripts/hud_preview.gd")
 const Art = preload("res://scripts/hud_art.gd")
+const Kit = preload("res://scripts/kit_generator.gd")
 const INK = Color("edf1f3")
 const MUTED = Color("87959f")
 const GREEN = Color("b9ef77")
@@ -47,6 +48,16 @@ var art_wear: HSlider
 var art_strength: HSlider
 var art_seed: SpinBox
 var art_update_timer: Timer
+var creation_picker: OptionButton
+var hud_brief: VBoxContainer
+var kit_brief: VBoxContainer
+var kit_style_picker: OptionButton
+var kit_material_picker: OptionButton
+var kit_ornament_picker: OptionButton
+var generate_button: Button
+var art_controls: VBoxContainer
+var kit_controls: VBoxContainer
+var regenerate_button: Button
 
 func _ready() -> void:
 	DisplayServer.window_set_min_size(Vector2i(1120, 900))
@@ -143,7 +154,7 @@ func _header(parent: Node) -> void:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	row.add_child(icon)
 	row.add_child(_label("UI FORGE", 23, INK))
-	row.add_child(_label("/   HUD STUDIO", 11, MUTED))
+	row.add_child(_label("/   UI STUDIO", 11, MUTED))
 	var spacer = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
@@ -157,10 +168,20 @@ func _header(parent: Node) -> void:
 	row.add_child(export_button)
 
 func _sidebar(parent: Node) -> void:
-	var body = _panel(parent, 268)
+	var outer = _panel(parent, 268)
+	var body = outer
 	body.add_child(_label("DESIGN BRIEF", 11, GREEN))
-	body.add_child(_label("Make it your world.", 21, INK))
-	body.add_child(_label("Choose a direction. We’ll build the HUD.", 12, MUTED))
+	creation_picker = OptionButton.new()
+	creation_picker.custom_minimum_size.y = 40
+	creation_picker.add_item("HUD layouts")
+	creation_picker.add_item("Fantasy UI kit")
+	creation_picker.item_selected.connect(_set_creation_mode)
+	body.add_child(creation_picker)
+	hud_brief = VBoxContainer.new()
+	hud_brief.add_theme_constant_override("separation", 10)
+	hud_brief.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer.add_child(hud_brief)
+	body = hud_brief
 	_space(body, 7)
 	body.add_child(_label("01   GAME TYPE", 11, MUTED))
 	genre_picker = OptionButton.new()
@@ -216,13 +237,45 @@ func _sidebar(parent: Node) -> void:
 			_mark_dirty())
 		component_checks[key] = check
 		components.add_child(check)
+	kit_brief = VBoxContainer.new()
+	kit_brief.add_theme_constant_override("separation", 10)
+	kit_brief.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	kit_brief.hide()
+	outer.add_child(kit_brief)
+	kit_brief.add_child(_label("A whole world of UI.", 21, INK))
+	kit_brief.add_child(_wrapped("Generate a matching menu, gameplay HUD, and library of reusable controls.", 12, MUTED))
+	kit_brief.add_child(_label("01   ART STYLE", 11, MUTED))
+	kit_style_picker = OptionButton.new()
+	for style in Kit.STYLES:
+		kit_style_picker.add_item(style)
+	kit_style_picker.item_selected.connect(func(_index): _mark_dirty())
+	kit_brief.add_child(kit_style_picker)
+	kit_brief.add_child(_label("02   MATERIAL", 11, MUTED))
+	kit_material_picker = OptionButton.new()
+	for material in Kit.MATERIALS:
+		kit_material_picker.add_item(material)
+	kit_material_picker.item_selected.connect(func(_index): _mark_dirty())
+	kit_brief.add_child(kit_material_picker)
+	kit_brief.add_child(_label("03   DECORATION", 11, MUTED))
+	kit_ornament_picker = OptionButton.new()
+	for amount in Kit.ORNAMENTS:
+		kit_ornament_picker.add_item(amount)
+	kit_ornament_picker.select(1)
+	kit_ornament_picker.item_selected.connect(func(_index): _mark_dirty())
+	kit_brief.add_child(kit_ornament_picker)
+	kit_brief.add_child(_wrapped("Carved frames · button states\nHealth & mana bars · ability slots\nInventory panels · original icons", 12, MUTED))
+	kit_brief.add_child(_wrapped("Every piece is drawn procedurally on your PC. No image service or downloaded artwork.", 11, MUTED))
+	var kit_stretch = Control.new()
+	kit_stretch.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	kit_brief.add_child(kit_stretch)
+	body = outer
 	body.add_child(_label("TARGET RESOLUTION", 11, MUTED))
 	resolution_picker = OptionButton.new()
 	for resolution in ["1920 × 1080  /  Full HD", "2560 × 1440  /  QHD", "1280 × 720  /  HD"]:
 		resolution_picker.add_item(resolution)
 	resolution_picker.item_selected.connect(func(_index): _mark_dirty())
 	body.add_child(resolution_picker)
-	var generate_button = _button("Generate 3 variations   →", true)
+	generate_button = _button("Generate 3 variations   →", true)
 	generate_button.custom_minimum_size.y = 45
 	generate_button.pressed.connect(generate)
 	body.add_child(generate_button)
@@ -324,7 +377,24 @@ func _inspector(parent: Node) -> void:
 	var reset = _button("Reset this layout")
 	reset.pressed.connect(_reset_layout)
 	body.add_child(reset)
+	kit_controls = VBoxContainer.new()
+	kit_controls.add_theme_constant_override("separation", 7)
+	kit_controls.hide()
+	body.add_child(kit_controls)
+	kit_controls.add_child(_label("REFINE ONE PIECE", 11, GREEN))
+	regenerate_button = _button("Regenerate selected")
+	regenerate_button.add_theme_font_size_override("font_size", 12)
+	regenerate_button.disabled = true
+	regenerate_button.pressed.connect(_regenerate_selected)
+	kit_controls.add_child(regenerate_button)
+	kit_controls.add_child(_wrapped("Select a piece in the preview to give it new details. Other pieces keep their artwork. Ctrl+Z undoes it.", 11, MUTED))
+	kit_controls.add_child(_wrapped("Menu · HUD · Components\nExport saves all three pages and their shared artwork.", 11, MUTED))
 	body.add_child(HSeparator.new())
+	var inspector_body = body
+	art_controls = VBoxContainer.new()
+	art_controls.add_theme_constant_override("separation", 7)
+	body.add_child(art_controls)
+	body = art_controls
 	body.add_child(_label("OFFLINE MATERIAL ART", 11, GREEN))
 	body.add_child(_wrapped("Layer textured surfaces and frames behind editable text and bars.", 11, MUTED))
 	body.add_child(_label("Material", 11, MUTED))
@@ -377,6 +447,7 @@ func _inspector(parent: Node) -> void:
 	art_update_timer.wait_time = .18
 	art_update_timer.timeout.connect(_apply_art_settings)
 	add_child(art_update_timer)
+	body = inspector_body
 	_space(body, 9)
 	body.add_child(_label("ACCENT COLOR", 11, MUTED))
 	accent_picker = ColorPickerButton.new()
@@ -425,6 +496,9 @@ func _inspector(parent: Node) -> void:
 	body.add_child(_wrapped("Map, ammo, and timers use sample data. Your game supplies the behavior.", 11, MUTED))
 
 func generate() -> void:
+	if creation_picker.selected == 1:
+		_generate_kit()
+		return
 	var selected: Array = []
 	for key in component_checks:
 		if component_checks[key].button_pressed:
@@ -445,6 +519,8 @@ func generate() -> void:
 	health_slider.value = current_config.health
 	mana_slider.value = current_config.mana
 	updating_controls = false
+	art_controls.show()
+	kit_controls.hide()
 	select_variant(0)
 	_refresh_previews()
 	health_slider.editable = "health" in selected
@@ -455,18 +531,82 @@ func generate() -> void:
 	dirty_label.modulate = Color.WHITE
 	status_label.text = "%s / %s · %d components · 3 variations generated locally." % [genre, selected_style, selected.size()]
 
+func _set_creation_mode(index: int) -> void:
+	creation_picker.select(index)
+	hud_brief.visible = index == 0
+	kit_brief.visible = index == 1
+	generate_button.text = "Generate complete kit   →" if index == 1 else "Generate 3 variations   →"
+	_mark_dirty()
+
+func _generate_kit() -> void:
+	art_update_timer.stop()
+	current_config = Kit.make_config(Kit.STYLES[kit_style_picker.selected])
+	current_config.kit.seed = randi_range(0, 2147483647)
+	current_config.kit.material = Kit.MATERIALS[kit_material_picker.selected]
+	current_config.kit.ornaments = Kit.ORNAMENTS[kit_ornament_picker.selected]
+	current_config.resolution = [Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(1280, 720)][resolution_picker.selected]
+	layout_history.clear_history()
+	preview.selected_element = ""
+	updating_controls = true
+	accent_picker.color = Color(current_config.accent)
+	size_slider.value = 100
+	health_slider.value = current_config.health
+	mana_slider.value = current_config.mana
+	health_slider.editable = true
+	mana_slider.editable = true
+	health_value.modulate.a = 1.0
+	mana_value.modulate.a = 1.0
+	updating_controls = false
+	art_controls.hide()
+	kit_controls.show()
+	select_variant(0)
+	_refresh_previews()
+	dirty_label.text = "3 matching kit pages"
+	dirty_label.modulate = Color.WHITE
+	status_label.text = "%s kit generated offline · Menu, HUD, and reusable components. Export saves the whole kit." % current_config.style
+
+func _regenerate_selected() -> void:
+	if current_config.get("mode", "hud") != "kit":
+		return
+	preview._finish_drag()
+	var node = preview.hud.get_node_or_null(NodePath(preview.selected_element)) if not preview.selected_element.is_empty() else null
+	if node == null:
+		status_label.text = "Select a kit component in the large preview first."
+		return
+	var component = str(node.get_meta("kit_component", node.name))
+	var overrides: Dictionary = current_config.kit.component_seeds
+	var had_override = overrides.has(component)
+	var previous = int(overrides.get(component, 0))
+	var next = randi_range(1, 2147483647)
+	while next == previous:
+		next = randi_range(1, 2147483647)
+	layout_history.create_action("Regenerate " + component)
+	layout_history.add_do_method(_apply_component_seed.bind(component, next, true))
+	layout_history.add_undo_method(_apply_component_seed.bind(component, previous, had_override))
+	layout_history.commit_action()
+
+func _apply_component_seed(component: String, seed_value: int, enabled: bool) -> void:
+	if enabled:
+		current_config.kit.component_seeds[component] = seed_value
+	else:
+		current_config.kit.component_seeds.erase(component)
+	_refresh_previews()
+	status_label.text = "%s artwork updated · arrangement is kept. Ctrl+Z to undo." % component
+
 func select_variant(index: int) -> void:
 	selected_variant = index
 	if current_config.is_empty():
 		return
-	var names: Array = Generator.PALETTES[current_config.style].names
+	var is_kit = current_config.get("mode", "hud") == "kit"
+	var names: Array = Kit.PAGES if is_kit else Generator.PALETTES[current_config.style].names
 	for i in range(3):
 		variant_buttons[i].set_pressed_no_signal(i == index)
 		variant_buttons[i].text = "%02d  %s%s" % [i + 1, names[i], "  ✓" if i == index else ""]
 		variant_labels[i].modulate = GREEN if i == index else Color.WHITE
+		variant_labels[i].text = ["Menu & panels", "Gameplay elements", "Reusable controls"][i] if is_kit else Generator.LAYOUTS[i]
 	title_label.text = "%02d  /  %s" % [index + 1, names[index]]
-	selected_label.text = names[index] + " / " + Generator.LAYOUTS[index]
-	detail_label.text = "%s · %s" % [current_config.genre.to_upper(), current_config.style.to_upper()]
+	selected_label.text = names[index] if is_kit else names[index] + " / " + Generator.LAYOUTS[index]
+	detail_label.text = current_config.style.to_upper() if is_kit else "%s · %s" % [current_config.genre.to_upper(), current_config.style.to_upper()]
 	preview.show_design(current_config, selected_variant)
 	_selection_changed(preview.selected_element)
 
@@ -480,6 +620,7 @@ func _selection_changed(element: String) -> void:
 	if not is_instance_valid(position_label):
 		return
 	var node = preview.hud.get_node_or_null(NodePath(element)) if not element.is_empty() else null
+	regenerate_button.disabled = node == null or current_config.get("mode", "hud") != "kit"
 	if node != null:
 		_position_changed(element, node.position)
 	else:
@@ -617,6 +758,7 @@ func _change_value(key: String, value: float) -> void:
 			view.hud.get_node(key.capitalize() + "/Amount").text = "%d / 100" % value
 
 func _new_ui() -> void:
+	_set_creation_mode(0)
 	genre_picker.select(0)
 	resolution_picker.select(0)
 	_select_style("Military")
@@ -628,6 +770,7 @@ func _open_export() -> void:
 		return
 	preview._finish_drag()
 	_flush_art_update()
+	export_dialog.title = "Choose a folder for your fantasy UI kit" if current_config.get("mode", "hud") == "kit" else "Choose a folder for your Godot HUD"
 	export_dialog.popup_centered_ratio(0.75)
 
 func _export_to(directory: String) -> void:
@@ -635,8 +778,9 @@ func _export_to(directory: String) -> void:
 	var result = Exporter.export_hud(current_config, selected_variant, directory)
 	if result.ok:
 		status_label.text = "Exported to " + result.path
-		export_result.title = "Your HUD is ready"
-		export_result.dialog_text = "Saved your editable scene, theme, preset, and integration guide.\n\n" + result.path + "\n\nCopy the whole folder into your Godot project and instance hud.tscn."
+		export_result.title = "Your kit is ready" if current_config.get("mode", "hud") == "kit" else "Your HUD is ready"
+		var contents = "Saved your complete kit: menu.tscn, hud.tscn, components.tscn, shared theme, artwork, and guide." if current_config.get("mode", "hud") == "kit" else "Saved your editable scene, theme, preset, and integration guide."
+		export_result.dialog_text = contents + "\n\n" + result.path + "\n\nCopy the whole folder into your Godot project."
 	else:
 		status_label.text = result.error
 		export_result.title = "Export needs attention"

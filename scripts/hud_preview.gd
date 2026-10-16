@@ -247,6 +247,16 @@ func _draw() -> void:
 		return
 	draw_set_transform(origin, 0, Vector2.ONE * design_scale)
 	var accent = Color(config.accent)
+	if config.get("mode", "hud") == "kit":
+		# A quiet display surface makes transparent kit assets easy to inspect.
+		draw_rect(Rect2(0, 0, 1280, 720), Color("171b20"))
+		for x in range(0, 1280, 80):
+			for y in range(0, 720, 80):
+				if (x / 80 + y / 80) % 2 == 0:
+					draw_rect(Rect2(x, y, 80, 80), Color("1c2127"))
+		draw_rect(Rect2(1, 1, 1278, 718), Color(accent, .15), false, 2)
+		draw_set_transform(Vector2.ZERO)
+		return
 	var sky_top = Color("192e37").lerp(accent.darkened(0.78), 0.3)
 	var sky_bottom = Color("617674").lerp(accent.darkened(0.48), 0.3)
 	for i in range(32):

@@ -1,8 +1,9 @@
 # Windows user guide
 
-This guide takes you from downloading UI Forge to exporting your first HUD.
-You do not need programming knowledge to design and export a HUD. Connecting
-that HUD to a running game is covered in the [Godot guide](godot-guide.md).
+This guide takes you from downloading UI Forge to exporting a HUD or a matching
+fantasy UI kit. You do not need programming knowledge to design and export.
+Connecting the controls to a running game is covered in the
+[Godot guide](godot-guide.md).
 
 [Back to the project home page](../README.md)
 
@@ -70,21 +71,23 @@ extracted folder. Keep the whole app folder together when moving it.
 
 | Area | What it controls |
 | --- | --- |
-| **Design Brief**, on the left | Game type, visual style, components, target resolution, and Generate |
-| Large central preview | The selected HUD variation over an illustrative background |
-| Three thumbnails below the preview | Balanced, Compact, and Cinematic layout options |
+| Mode dropdown at the top of **Design Brief** | Choose **HUD layouts** or **Fantasy UI kit** |
+| **Design Brief**, on the left | HUD game type/style/components, or kit art style/material/decoration; target resolution and Generate |
+| Large central preview | The selected layout or kit page over an illustrative background; select, move, and resize pieces here |
+| Three thumbnails below the preview | HUD layout options, or the kit's Menu, HUD, and Components pages |
 | **The Finishing Touches**, on the right | Accent color, HUD size, and example health/mana values |
 | **Arrange Elements**, in the right panel | Selected component coordinates, grid snapping, and layout reset |
 | **Offline Material Art**, in the right panel | Surface material, frame detail, texture size, wear, opacity, and seed |
+| **Refine One Piece**, in the right panel | **Regenerate selected** changes one kit component's artwork |
 | **New UI**, at the top | Resets the brief and customizations to the initial FPS/Military design |
-| **Export to Godot**, at the top | Saves the selected design into a new folder |
+| **Export to Godot**, at the top | Saves the selected HUD layout, or all three kit pages, into a new folder |
 | Status line, at the bottom | Generation messages, export location, and errors |
 
 ## 5. Create a first FPS HUD
 
 1. Click **New UI** to start with the default design. Export any design you
    want to keep before resetting it.
-2. Under **01 Game Type**, select **FPS**.
+2. Keep **HUD layouts** selected, then under **01 Game Type**, select **FPS**.
 3. Under **02 Visual Style**, click **Military**.
 4. Under **03 Components**, keep Health bar, Armor bar, Minimap, Weapon & ammo,
    Crosshair, and Objective tracker selected. Scroll inside this list to find
@@ -109,7 +112,8 @@ remain editable for every genre. At least one component must be selected.
    A faded slider means that component is not in the generated HUD.
 
 Accent, size, health, and mana changes appear immediately and carry into the
-export. They apply to all three generated variations.
+export. They apply to all three generated HUD variations, or all three pages
+when working on a fantasy kit.
 
 ### Move components with your mouse
 
@@ -143,12 +147,15 @@ limit enlargement; move the component away from an edge for more room. With
 **Snap to 8 px grid**, resizing snaps the width while preserving proportions.
 The **HUD Size** slider scales the overall design on top of individual scales.
 
-Positions are stored separately for Balanced, Compact, and Cinematic. Switching
-variations keeps their edits. Changing color or frame artwork keeps custom
+Positions are stored separately for Balanced, Compact, and Cinematic, or for
+each kit page. Switching previews keeps their edits. Changing color or frame artwork keeps custom
 positions and scales; the exported scene uses the same arrangement. Thumbnails
 select variations; dragging is enabled in the large preview.
 
 ### Generate textured artwork offline
+
+These controls belong to **HUD layouts** mode. Fantasy kits generate their
+artwork automatically with the simple controls described below.
 
 1. Scroll the right-hand panel to **Offline Material Art**.
 2. Choose a **Material**: brushed metal, leather, stone, wood, glass, carbon
@@ -175,25 +182,90 @@ Artwork is generated procedurally on your PC, without an AI service, account,
 or API key. It decorates panel components; the crosshair keeps its native shapes.
 Exports include a separate PNG for each panel at twice its base dimensions,
 and `preset.json` records the material settings and seed. Copy the `art/` folder
-with the scene. Layout undo/redo applies to moving and resizing; it does not
-undo artwork changes. Export your design before starting another one.
+with the scene. In HUD layouts mode, undo/redo applies to moving and resizing;
+it does not undo material-art changes. Kit component regeneration also supports
+undo, as described below. Export your design before starting another one.
 
 Changing game type, style, components, or resolution leaves a **Changes pending**
 message. Click **Generate** to apply those changes. Generate resets accent,
 size, sample values, component positions/scales, and artwork to defaults, so
-refine those settings after generation. Export always uses the visible design.
+refine those settings after generation. HUD export uses the selected layout.
+Kit export saves all three generated pages.
 
 Keyboard shortcuts: **Ctrl+G** generates; **Ctrl+E** opens export.
 
-## 7. Export your HUD
+## Create a fantasy UI kit
+
+Use this mode to generate a menu, gameplay HUD, and reusable components with
+matching shapes, materials, colors, and ornaments.
+
+1. Export any current work you want to keep.
+2. At the top of the left **Design Brief** panel, change **HUD layouts** to
+   **Fantasy UI kit**.
+3. Under **Art Style**, choose **Illustrated fantasy** for smooth carved frames
+   and layered ornaments, or **Medieval pixel** for blocky pixel artwork.
+4. Under **Material**, choose **Wood**, **Stone**, or **Parchment**.
+5. Under **Decoration**, choose **Simple**, **Balanced**, or **Rich**. This
+   controls the amount of trim and ornamentation.
+6. Choose **Target Resolution**, then click **Generate complete kit**.
+7. Click **Menu**, **HUD**, and **Components** below the previews to inspect
+   the three pages. These are parts of one kit, rather than alternative layouts.
+
+![The two fantasy kit art styles](fantasy-kits.png)
+
+| Page | Included examples |
+| --- | --- |
+| **Menu** | Title banner, menu panel, Continue/New journey/Settings/Exit buttons, character panel, and quest card |
+| **HUD** | Health/mana bars, currency, minimap sample, objective panel, ability buttons, and quest-log button |
+| **Components** | Framed panel, button-state examples, inventory slots, health/mana bars, and procedural icons |
+
+Every image is drawn procedurally on your PC. Both styles work offline and
+need no image downloads, AI service, account, or key. The controls and sample
+screens form a starting kit; the app does not create gameplay logic.
+
+### Refine one piece without replacing the kit
+
+1. Open the page containing the piece you want to change.
+2. Click it in the **large preview**. Its outline turns green and the right
+   inspector shows its name. You select a whole component: for example,
+   **Inventory** includes its slots and icons, and **Health** includes its frame,
+   emblem, and bar artwork.
+3. Under **Refine One Piece**, click **Regenerate selected**.
+4. Inspect the new details. Click again for another result, or press **Ctrl+Z**
+   to restore the previous artwork. **Ctrl+Shift+Z** or **Ctrl+Y** redoes it.
+
+Regeneration changes that component's artwork, including its related states
+and icons. Other components keep their artwork, and all pages keep their
+positions and sizes. A component used on multiple pages, such as **Health**
+or **TitleBanner**, receives the change on each of those pages.
+
+Drag pieces and use their corner handles as described above. **Accent Color**,
+**HUD Size**, and the live **Health**/**Mana** sliders work for kits too.
+**Offline Material Art** is hidden in kit mode; the material and decoration
+choices on the left supply the kit artwork.
+
+Changing the kit style, material, decoration, or resolution marks the brief as
+pending. **Generate complete kit** applies it by creating a fresh entire kit
+and resetting the current arrangement, color, sizes, and sample values. Export
+first if you want to keep the previous result. **Regenerate selected** is the
+way to change one piece while preserving the current kit.
+
+Buttons in the designer are selected and arranged with the mouse. Their game
+actions become available after export, when you connect their native signals
+in Godot. The **Components** page displays examples of the button states.
+Pixel artwork uses nearest filtering. Fractional viewport scaling can make
+pixel widths uneven; use whole-number game scaling for the sharpest pixel grid.
+
+## 7. Export your HUD or kit
 
 1. In File Explorer, create a folder such as
    `C:\Users\YourName\Documents\UIForgeExports`.
-2. In UI Forge, select the variation you want to use.
+2. In UI Forge, select the HUD variation you want to use. For a kit, any page
+   can be selected: **all three pages will be exported**.
 3. Click **Export to Godot**.
 4. In the folder chooser, navigate to `Documents\UIForgeExports` and select
    that folder as the destination. The destination must already exist.
-5. Wait for the **Your HUD is ready** message. It shows the full output path.
+5. Wait for the export-success dialog. It shows the full output path.
 6. Open that path in File Explorer.
 
 For the FPS/Military/Balanced example, the app creates a folder like this:
@@ -223,14 +295,41 @@ overwrite previous exports.
 
 Continue with [Add an exported HUD to your game](godot-guide.md#add-an-exported-hud-to-your-game).
 
+### Fantasy kit export
+
+A kit creates a folder such as this:
+
+```text
+UIForgeExports/
+  uiforge_kit_illustrated_fantasy/
+    menu.tscn
+    hud.tscn
+    components.tscn
+    kit_theme.tres
+    preset.json
+    README.md
+    art/
+      ...generated frame, state, fill, and icon PNGs...
+```
+
+Keep the **whole folder** together. `menu.tscn` is the menu example,
+`hud.tscn` is the gameplay overlay, and `components.tscn` is a collection of
+matching reusable controls. They share `kit_theme.tres` and use images in
+`art/`. Some button images appear only on hover, focus, or press, so keep all
+of them. `preset.json` records the complete kit seed and individual component
+seeds, settings, positions, and sizes; it cannot yet be reopened in UI Forge.
+
+Continue with [Add an exported fantasy kit to your game](godot-guide.md#add-an-exported-fantasy-kit-to-your-game).
+
 ## 8. Keep your work
 
-Export before closing the app or clicking **New UI**. Designs are currently
-held in memory, and reopening exported presets in UI Forge is not implemented.
+Export before closing the app, generating another design, or clicking **New UI**.
+Designs are currently held in memory, and reopening exported presets in UI Forge
+is not implemented.
 You can keep editing the exported scene and theme directly in Godot.
 
-The minimap, weapon values, timers, and ability slots contain example data.
-They become functional when connected to your game's code. The central preview
+The menus, minimap, weapon values, timers, inventory, and ability slots contain
+example data. They become functional when connected to your game's code. The central preview
 background is illustrative and is not exported. Generation uses local templates.
 
 ## Troubleshooting
@@ -247,6 +346,10 @@ background is illustrative and is not exported. Generation uses local templates.
 | Dragging a thumbnail does not move a component | Choose a variation, then drag its component in the large central preview. |
 | Artwork or arrangement controls are missing | Scroll inside the right-hand inspector panel. |
 | Art generation says it needs a panel | Include Health, Minimap, Weapon, or another panel component. The crosshair is made of native shapes. |
+| Regenerate selected is disabled | Generate a fantasy kit, then select a piece in the large preview. |
+| Kit material/style changes are not visible | Click **Generate complete kit** to apply the pending brief. Export the current kit first if you want to keep it. |
+| A kit exports pages you were not viewing | This is expected: every kit export includes Menu, HUD, and Components. |
+| Menu buttons do not start a game | Export the kit, add the menu to your game, and connect its Button signals to your game code. |
 | Export fails | Choose an existing writable folder, such as a folder in Documents. Read the status line for the specific error. |
 | Map or ammo is not changing in a game | Those are sample controls; follow the Godot integration guide and connect gameplay data. |
 

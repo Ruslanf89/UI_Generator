@@ -12,6 +12,7 @@ repository root
 ```sh
 godot --headless --editor --path . --import --quit
 godot --headless --path . --script tests/run_tests.gd
+godot --headless --path . --script tests/run_kit_tests.gd
 godot --headless --path . --quit-after 6
 ```
 
@@ -30,6 +31,14 @@ a moved, textured HUD into an independent game project. Exported PNG pixels are
 compared with the preview. Generated material PNGs use relative paths and need Godot's normal
 image import before running a copied scene.
 
+The fantasy kit suite is separate from the original HUD regression suite. Run
+both after changing shared preview or app behavior. It checks the two kit art
+styles, native controls and button states, repeatable procedural artwork,
+individual component regeneration, and portable three-scene exports. Kit
+exports must retain each page's custom transforms and load in a separate game
+project with all PNGs imported. Visual inspection is still needed for text
+readability, ornament placement, and the pixel grid at different window sizes.
+
 In a cloud shell with a read-only home directory, initialize writable runtime
 locations before Godot commands:
 
@@ -39,6 +48,26 @@ export XDG_CACHE_HOME=/tmp/ui-generator-godot/cache
 export XDG_DATA_HOME=/tmp/ui-generator-godot/data
 export XDG_CONFIG_HOME=/tmp/ui-generator-godot/config
 ```
+
+## Work on the designer and generators
+
+The designer window is constructed by `scripts/app.gd` at runtime; the main
+scene contains its root Control. See
+[Edit the UI Forge designer itself](godot-guide.md#edit-the-ui-forge-designer-itself)
+for the editor workflow and a source-file map.
+
+Fantasy kit generation is split between `scripts/kit_generator.gd` (native
+controls and the Menu/HUD/Components pages), `scripts/kit_art.gd` (seeded
+procedural images), and `scripts/kit_exporter.gd` (portable scenes, theme, and
+PNGs). Preserve component identifiers when sharing artwork across pages: a
+component seed override should change that component everywhere it appears,
+while leaving other artwork and all transforms intact.
+
+Kit artwork is generated entirely offline. Additions should remain procedural
+and should not introduce downloaded illustrations, an image-generation service,
+or a provider key. Keep export scenes independent of generator scripts. Button
+state textures and textures inside StyleBoxTexture resources must be included
+under `art/`, even when they are not visible in a normal-state preview.
 
 ## Package a standalone app
 
