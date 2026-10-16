@@ -238,8 +238,8 @@ HUD
 | Move a component | Edit its Control position in the exported `hud.tscn`, or override the child in your game scene. |
 | Update health or mana | Set its ProgressBar's `value`/`max_value` and update its `Amount` Label. |
 | Make a real minimap | Replace sample nodes in `Minimap/MapContent` with your map or camera-driven UI. |
-| Replace a generated frame | Select the component's `Art` TextureRect and change **Texture**, or edit its PNG under the export's `art/` folder. |
-| Change frame opacity | Select its `Art` TextureRect and change **Modulate** alpha under CanvasItem visibility. |
+| Replace a generated material/frame | Select the component's `Art` TextureRect and change **Texture**, or edit its PNG under the export's `art/` folder. The surface and frame are composited in one PNG; labels and bars stay separate. |
+| Change material opacity | Select its `Art` TextureRect and change **Modulate** alpha under CanvasItem visibility. |
 
 These paths are relative to **Elements**. Only selected components exist:
 

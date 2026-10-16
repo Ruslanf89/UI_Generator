@@ -42,8 +42,9 @@ project rather than a ready-to-run Windows executable.
 6. Drag components in the large preview to arrange them, then drag a selected
    component's corner handles to rescale it. Optional snapping, keyboard
    nudging, undo/redo, and **Reset this layout** help refine placement.
-7. In **Offline Frame Art** on the right, choose a detail style and click
-   **Generate art** for decorative panel artwork. Scroll the right panel if needed.
+7. In **Offline Material Art** on the right, choose a material and frame detail,
+   then click **Generate art**. Adjust texture size, wear, and opacity; **New**
+   beside the seed generates another surface. Scroll the right panel if needed.
 8. Click **Export to Godot** and select an existing folder to save into.
 
 The app creates a new folder containing `hud.tscn`, `hud_theme.tres`,
@@ -61,7 +62,9 @@ The exported scene keeps your custom element positions and individual scales.
 - Mouse placement and proportional corner resizing per variation, optional
   8 px snapping, arrow-key nudging,
   undo/redo, and preset layout reset.
-- Offline, seeded frame artwork with style-native, ornate, tech, and weathered details.
+- Seven offline materials: brushed metal, leather, stone, wood, glass, carbon
+  fiber, and parchment. Combine them with ornate, tech, weathered, or clean frames.
+- Adjustable texture size, wear, opacity, and repeatable seeds; portable PNG exports.
 - Editable native Godot controls and a shared theme, with no generator plugin
   required in your game.
 
@@ -69,6 +72,8 @@ Generation uses local templates. The map, ammo, timers, and ability slots use
 example data; connect them to your game logic. The preview background is not
 included in the exported HUD. Artwork is generated procedurally on your PC;
 it does not use an AI image service or require a key.
+
+![Generated material surfaces](docs/materials.png)
 
 Designs are held in memory. **Export before closing the app or clicking New UI.**
 Changing the brief requires Generate to apply; Generate resets the current

@@ -151,7 +151,7 @@ not the UI Forge desktop application. It contains native editable Control nodes.
    This opens the game folder containing your game's project.godot.
 3. Create a ui folder there, then copy this entire exported folder into it.
    Keep hud.tscn and hud_theme.tres beside each other.
-   If an art folder is included, copy it too; it contains generated frame PNGs.
+   If an art folder is included, copy it too; it contains generated material PNGs.
 4. Return to Godot and wait for the new files to appear.
 5. Open your gameplay scene. Select its root and add a CanvasLayer child.
 6. Drag this folder's hud.tscn from FileSystem onto CanvasLayer in the Scene dock.
@@ -183,8 +183,10 @@ Its controls are below Canvas > Viewport > Design > Elements. Edit their text,
 position, or Theme Overrides in the Inspector. The Elements node uses the shared
 hud_theme.tres resource; changing that theme affects controls that use it.
 Custom mouse positions and component scales are already applied to the scene.
-Generated frame artwork is a TextureRect named Art within each panel. You can
-replace its texture or change its opacity without changing the labels and bars.
+Generated material and frame artwork is composited into a TextureRect named Art
+within each panel. You can replace its texture or change its opacity without
+changing the labels and bars. Each PNG is twice the panel's base dimensions;
+preset.json records the material, frame detail, texture size, wear, and seed.
 
 ## Connect gameplay values
 

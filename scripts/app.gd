@@ -41,6 +41,12 @@ var updating_controls = false
 var position_label: Label
 var layout_history = UndoRedo.new()
 var art_detail: OptionButton
+var art_material: OptionButton
+var art_scale: HSlider
+var art_wear: HSlider
+var art_strength: HSlider
+var art_seed: SpinBox
+var art_update_timer: Timer
 
 func _ready() -> void:
 	DisplayServer.window_set_min_size(Vector2i(1120, 900))
@@ -319,12 +325,20 @@ func _inspector(parent: Node) -> void:
 	reset.pressed.connect(_reset_layout)
 	body.add_child(reset)
 	body.add_child(HSeparator.new())
-	body.add_child(_label("OFFLINE FRAME ART", 11, GREEN))
-	body.add_child(_wrapped("Generate decorative frames locally. Your text and bars stay editable.", 11, MUTED))
+	body.add_child(_label("OFFLINE MATERIAL ART", 11, GREEN))
+	body.add_child(_wrapped("Layer textured surfaces and frames behind editable text and bars.", 11, MUTED))
+	body.add_child(_label("Material", 11, MUTED))
+	art_material = OptionButton.new()
+	for material in Art.MATERIALS:
+		art_material.add_item(material)
+	body.add_child(art_material)
+	art_material.item_selected.connect(func(_index): _queue_art_update())
+	body.add_child(_label("Frame detail", 11, MUTED))
 	art_detail = OptionButton.new()
 	for detail in Art.DETAILS:
 		art_detail.add_item(detail)
 	body.add_child(art_detail)
+	art_detail.item_selected.connect(func(_index): _queue_art_update())
 	var art_buttons = HBoxContainer.new()
 	art_buttons.add_theme_constant_override("separation", 6)
 	body.add_child(art_buttons)
@@ -335,6 +349,34 @@ func _inspector(parent: Node) -> void:
 	var clear_art = _button("Clear")
 	clear_art.pressed.connect(_clear_art)
 	art_buttons.add_child(clear_art)
+	art_scale = _art_slider(body, "Texture size", 50, 200, 100)
+	art_scale.step = 5
+	art_wear = _art_slider(body, "Wear", 0, 100, 30)
+	art_strength = _art_slider(body, "Art opacity", 10, 100, 85)
+	body.add_child(_label("Seed · reuse to reproduce a surface", 11, MUTED))
+	var seed_row = HBoxContainer.new()
+	seed_row.add_theme_constant_override("separation", 6)
+	body.add_child(seed_row)
+	art_seed = SpinBox.new()
+	art_seed.min_value = 0
+	art_seed.max_value = 2147483647
+	art_seed.step = 1
+	art_seed.value = randi_range(0, 2147483647)
+	art_seed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	art_seed.value_changed.connect(func(_value): _queue_art_update())
+	seed_row.add_child(art_seed)
+	var reroll = _button("New")
+	reroll.tooltip_text = "Choose a new seed and generate a fresh surface"
+	reroll.pressed.connect(func():
+		art_seed.set_value_no_signal(randi_range(0, 2147483647))
+		_generate_art())
+	seed_row.add_child(reroll)
+	body.add_child(_wrapped("New rolls a fresh seed. Material controls update existing artwork automatically.", 11, MUTED))
+	art_update_timer = Timer.new()
+	art_update_timer.one_shot = true
+	art_update_timer.wait_time = .18
+	art_update_timer.timeout.connect(_apply_art_settings)
+	add_child(art_update_timer)
 	_space(body, 9)
 	body.add_child(_label("ACCENT COLOR", 11, MUTED))
 	accent_picker = ColorPickerButton.new()
@@ -390,6 +432,7 @@ func generate() -> void:
 	if selected.is_empty():
 		status_label.text = "Choose at least one component before generating."
 		return
+	art_update_timer.stop()
 	var genre = Generator.GENRES[genre_picker.selected]
 	current_config = Generator.make_config(genre, selected_style)
 	current_config.components = selected
@@ -501,14 +544,34 @@ func _generate_art() -> void:
 	if not preview.hud.get_children().any(func(node): return node is Panel):
 		status_label.text = "Frame art needs a panel component, such as Health or Weapon. The crosshair uses native shapes."
 		return
-	current_config.art = {"enabled": true, "seed": randi_range(0, 2147483647), "detail": Art.DETAILS[art_detail.selected], "strength": 0.85}
+	art_update_timer.stop()
+	current_config.art = {"enabled": true}
+	_apply_art_settings()
+
+func _queue_art_update() -> void:
+	if is_instance_valid(art_update_timer) and not current_config.is_empty() and current_config.art.get("enabled", false):
+		art_update_timer.start()
+
+func _apply_art_settings() -> void:
+	if current_config.is_empty() or not current_config.art.get("enabled", false):
+		return
+	if preview.dragging or preview.resizing:
+		art_update_timer.start()
+		return
+	current_config.art = {"enabled": true, "seed": int(art_seed.value), "material": Art.MATERIALS[art_material.selected], "detail": Art.DETAILS[art_detail.selected], "texture_scale": art_scale.value / 100.0, "wear": art_wear.value / 100.0, "strength": art_strength.value / 100.0}
 	_refresh_previews()
-	status_label.text = "Generated %s frame art locally. Generate again for a new seed; export includes PNG assets." % current_config.art.detail.to_lower()
+	status_label.text = "%s · seed %d · generated offline. Export includes material PNGs." % [Art.material_for(current_config), current_config.art.seed]
+
+func _flush_art_update() -> void:
+	if not art_update_timer.is_stopped():
+		art_update_timer.stop()
+		_apply_art_settings()
 
 func _clear_art() -> void:
+	art_update_timer.stop()
 	current_config.art = {"enabled": false}
 	_refresh_previews()
-	status_label.text = "Frame art cleared. Custom element positions are kept."
+	status_label.text = "Material art cleared. Custom positions and scales are kept."
 
 func _apply_genre_defaults() -> void:
 	var defaults: Array = Generator.DEFAULTS[Generator.GENRES[genre_picker.selected]]
@@ -564,9 +627,11 @@ func _open_export() -> void:
 	if current_config.is_empty():
 		return
 	preview._finish_drag()
+	_flush_art_update()
 	export_dialog.popup_centered_ratio(0.75)
 
 func _export_to(directory: String) -> void:
+	_flush_art_update()
 	var result = Exporter.export_hud(current_config, selected_variant, directory)
 	if result.ok:
 		status_label.text = "Exported to " + result.path
@@ -655,6 +720,15 @@ func _slider(parent: Node, minimum: float, maximum: float, value: float) -> HSli
 	slider.custom_minimum_size.y = 25
 	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	parent.add_child(slider)
+	return slider
+
+func _art_slider(parent: Node, caption: String, minimum: float, maximum: float, value: float) -> HSlider:
+	var label = _label("%s  /  %d%%" % [caption, value], 11, MUTED)
+	parent.add_child(label)
+	var slider = _slider(parent, minimum, maximum, value)
+	slider.value_changed.connect(func(amount):
+		label.text = "%s  /  %d%%" % [caption, amount]
+		_queue_art_update())
 	return slider
 
 func _space(parent: Node, height: float) -> void:

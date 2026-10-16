@@ -50,9 +50,10 @@ CREATE YOUR FIRST HUD
    its own positions.
    Drag a selected component's corner handles to rescale it proportionally.
    Resizing supports undo/redo; Esc cancels an unfinished move or resize.
-7. Under Offline Frame Art, choose a detail and click Generate art for new
-   procedural panel frames. Scroll the right panel to reach its tools. Clear
-   removes artwork while preserving positions. No AI service or key is needed.
+7. Under Offline Material Art, choose a material and frame, then click Generate
+   art. Adjust texture size, wear, and opacity. New beside Seed generates a fresh
+   pattern; entering a seed reproduces it with matching settings. Scroll the right
+   panel to reach its tools. Clear keeps positions/scales. No service or key needed.
 
 Changing genre, style, components, or resolution requires Generate to apply.
 Generate resets color, size, sample values, component positions/scales, and artwork. Apply those
@@ -181,7 +182,7 @@ def main() -> int:
         (package / "README.txt").write_text(GUIDE, encoding="utf-8")
         guides = (
             "README.md", "docs/windows-guide.md", "docs/godot-guide.md",
-            "docs/development.md", "docs/examples/health_demo.gd", "docs/screenshot.png",
+            "docs/development.md", "docs/examples/health_demo.gd", "docs/screenshot.png", "docs/materials.png",
         )
         for relative in guides:
             destination = package / relative

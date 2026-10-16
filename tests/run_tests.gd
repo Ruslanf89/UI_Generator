@@ -30,6 +30,8 @@ func _run() -> void:
 	await _test_resizing()
 	await _test_export()
 	_test_art_variations()
+	await _test_material_controls()
+	_test_materials()
 	await _test_art_export()
 	_test_git_updates()
 	if failures.is_empty():
@@ -294,6 +296,78 @@ func _test_art_variations() -> void:
 	first.free()
 	second.free()
 
+func _test_materials() -> void:
+	var config = Generator.make_config("RPG", "Fantasy")
+	config.art = {"enabled": true, "seed": 4271, "detail": "Clean", "material": "Wood", "texture_scale": 1.0, "wear": 0.3}
+	var fingerprints: Array[String] = []
+	for material in Art.MATERIALS.slice(1):
+		config.art.material = material
+		var texture = Art.make_texture(config, Vector2(280, 64), "Health", 0)
+		check(texture != null, "%s material rasterizes" % material)
+		if texture == null:
+			continue
+		var image = texture.get_image()
+		check(image.get_pixel(0, 0).a < .1 and image.get_pixel(280, 64).a > .2, "%s has a transparent silhouette and visible surface" % material)
+		var fingerprint = image.get_data().hex_encode().sha256_text()
+		check(not fingerprint in fingerprints, "%s produces a distinct material surface" % material)
+		fingerprints.append(fingerprint)
+		Art.texture_cache.clear()
+		check(Art.make_texture(config, Vector2(280, 64), "Health", 0).get_image().get_data() == image.get_data(), "%s reproduces pixels after clearing the texture cache" % material)
+		config.art.seed = 4272
+		check(Art.make_texture(config, Vector2(280, 64), "Health", 0).get_image().get_data() != image.get_data(), "%s changes with the seed" % material)
+		config.art.seed = 4271
+		config.art.texture_scale = 1.75
+		check(Art.make_texture(config, Vector2(280, 64), "Health", 0).get_image().get_data() != image.get_data(), "%s responds to texture size without returning stale cache pixels" % material)
+		config.art.texture_scale = 1.0
+		config.art.wear = 1.0
+		check(Art.make_texture(config, Vector2(280, 64), "Health", 0).get_image().get_data() != image.get_data(), "%s responds to wear" % material)
+		config.art.wear = 0.3
+		check(Art.make_texture(config, Vector2(280, 64), "Mana", 0).get_image().get_data() != image.get_data(), "%s varies its surface between elements" % material)
+		check(Art.make_texture(config, Vector2(280, 64), "Health", 1).get_image().get_data() != image.get_data(), "%s varies its surface between layouts" % material)
+	for style in Generator.STYLES:
+		config = Generator.make_config("FPS", style)
+		check(Art.material_for(config) == Art.STYLE_MATERIALS[style], "%s has a style-native material" % style)
+
+func _test_material_controls() -> void:
+	var app = load("res://scenes/main.tscn").instantiate()
+	root.add_child(app)
+	await process_frame
+	app._apply_transform(0, "Health", Vector2(240, 350), 1.4)
+	app.art_material.select(Art.MATERIALS.find("Wood"))
+	app.art_detail.select(Art.DETAILS.find("Clean"))
+	app.art_seed.value = 98765
+	app._generate_art()
+	var original: PackedByteArray = app.preview.hud.get_node("Health/Art").texture.get_image().get_data()
+	check(app.current_config.art.seed == 98765 and app.current_config.art.material == "Wood", "Generate art uses the chosen material and typed seed")
+	app._generate_art()
+	check(app.preview.hud.get_node("Health/Art").texture.get_image().get_data() == original, "Generate art preserves an explicit seed")
+	app.art_material.select(Art.MATERIALS.find("Stone"))
+	app.art_material.item_selected.emit(app.art_material.selected)
+	app.art_scale.value = 150
+	app.art_wear.value = 80
+	app.art_strength.value = 45
+	await create_timer(.25).timeout
+	check(app.current_config.art.material == "Stone" and is_equal_approx(app.current_config.art.texture_scale, 1.5) and is_equal_approx(app.current_config.art.wear, .8), "Material and slider edits automatically update the generated surface")
+	check(app.current_config.art.seed == 98765, "Live texture edits keep the existing seed")
+	check(is_equal_approx(app.preview.hud.get_node("Health/Art").modulate.a, .45), "Opacity controls the exported Art layer")
+	check(app.preview.hud.get_node("Health").position == Vector2(240, 350) and is_equal_approx(app.preview.hud.get_node("Health").scale.x, 1.4), "Live material edits preserve moved and resized components")
+	app.art_seed.value = 123456
+	app._export_to(scratch)
+	var manifest_path = app.export_result.dialog_text.get_slice("\n\n", 1).path_join("preset.json")
+	var manifest = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
+	check(manifest != null and manifest.art.seed == 123456, "Immediate export applies a pending seed edit before saving")
+	app.art_scale.value = 125
+	app._clear_art()
+	await create_timer(.25).timeout
+	check(not app.current_config.art.enabled and not app.preview.hud.has_node("Health/Art"), "A queued slider change cannot bring cleared artwork back")
+	app._generate_art()
+	app.art_wear.value = 40
+	app.generate()
+	await create_timer(.25).timeout
+	check(not app.current_config.art.enabled, "Generating a new design cancels pending artwork updates")
+	app.queue_free()
+	await process_frame
+
 func _resize(app: Control, corner: int, delta: Vector2) -> void:
 	var from: Vector2 = app.preview._handle_positions()[corner]
 	var to = from + delta * app.preview.design_scale
@@ -374,7 +448,10 @@ func _test_art_export() -> void:
 	var config = Generator.make_config("RPG", "Fantasy")
 	config.positions = {"2": {"Health": Vector2(320, 430), "Minimap": Vector2(850, 90)}}
 	config.element_scales = {"2": {"Health": 1.75, "Minimap": 0.8}}
-	config.art = {"enabled": true, "seed": 3210, "detail": "Ornate", "strength": 0.7}
+	config.art = {"enabled": true, "seed": 3210, "detail": "Ornate", "strength": 0.7, "material": "Leather", "texture_scale": 1.5, "wear": 0.8}
+	var expected = Generator.build(config, 2)
+	var expected_image: Image = expected.get_node("Health/Art").texture.get_image()
+	expected.free()
 	var result = Exporter.export_hud(config, 2, scratch)
 	check(result.ok, "Custom-position HUD with generated art exports")
 	if not result.ok:
@@ -383,11 +460,13 @@ func _test_art_export() -> void:
 	check(DirAccess.get_files_at(art_path).size() == config.components.size(), "Every selected panel exports its PNG artwork")
 	var image = Image.load_from_file(art_path.path_join("health.png"))
 	check(image != null and image.get_size() == Vector2i(560, 128), "Exported artwork is a usable PNG image")
+	check(image.get_data() == expected_image.get_data(), "Exported material PNG contains exactly the pixels used by the preview")
 	var scene_text = FileAccess.get_file_as_string(result.scene)
 	check(scene_text.contains('path="art/health.png"') and not scene_text.contains("/tmp/"), "Artwork uses portable relative resource paths")
 	var manifest = JSON.parse_string(FileAccess.get_file_as_string(result.path.path_join("preset.json")))
 	check(manifest.positions["2"].Health.x == 320 and manifest.positions["2"].Health.y == 430 and manifest.art.seed == 3210, "Preset records numeric custom positions and reproducible art settings")
 	check(is_equal_approx(manifest.element_scales["2"].Health, 1.75), "Preset records individual component scales")
+	check(manifest.art.material == "Leather" and is_equal_approx(manifest.art.texture_scale, 1.5) and is_equal_approx(manifest.art.wear, .8), "Export manifest records the material and surface settings")
 	var game = scratch.path_join("art_game")
 	DirAccess.make_dir_recursive_absolute(game.path_join("hud/art"))
 	for filename in ["hud.tscn", "hud_theme.tres"]:

@@ -75,7 +75,7 @@ extracted folder. Keep the whole app folder together when moving it.
 | Three thumbnails below the preview | Balanced, Compact, and Cinematic layout options |
 | **The Finishing Touches**, on the right | Accent color, HUD size, and example health/mana values |
 | **Arrange Elements**, in the right panel | Selected component coordinates, grid snapping, and layout reset |
-| **Offline Frame Art**, in the right panel | Procedural artwork detail and Generate art / Clear buttons |
+| **Offline Material Art**, in the right panel | Surface material, frame detail, texture size, wear, opacity, and seed |
 | **New UI**, at the top | Resets the brief and customizations to the initial FPS/Military design |
 | **Export to Godot**, at the top | Saves the selected design into a new folder |
 | Status line, at the bottom | Generation messages, export location, and errors |
@@ -148,21 +148,35 @@ variations keeps their edits. Changing color or frame artwork keeps custom
 positions and scales; the exported scene uses the same arrangement. Thumbnails
 select variations; dragging is enabled in the large preview.
 
-### Generate decorative artwork offline
+### Generate textured artwork offline
 
-1. Scroll the right-hand panel to **Offline Frame Art**.
-2. Choose **Style native**, **Ornate**, **Tech**, or **Weathered**.
-   Style native chooses details for the current visual style: for example,
-   filigree for Fantasy or technical borders for Sci-fi.
-3. Click **Generate art**. Frames appear behind the text and progress bars in
-   all three variations. Each click creates a new random seed.
-4. Change the accent color to recolor the frames while keeping the same seed.
-5. Click **Clear** to remove artwork and keep your custom positions.
+1. Scroll the right-hand panel to **Offline Material Art**.
+2. Choose a **Material**: brushed metal, leather, stone, wood, glass, carbon
+   fiber, or parchment. **Style native** selects a suitable material automatically:
+   metal for Military, leather for Fantasy, stone for Horror, glass for Modern
+   and Minimal, and carbon fiber for Sci-fi.
+3. Choose a separate **Frame detail**: Style native, Ornate, Tech, Weathered,
+   or Clean. Try Leather + Ornate for Fantasy, or Carbon fiber + Tech for Sci-fi.
+4. Click **Generate art**. Textured panels appear in all three variations.
+5. Adjust **Texture size** (50–200%) for finer or larger grain, **Wear** for
+   additional edge chips and scratches, and **Art opacity** for subtler or stronger
+   surfaces. Material controls update existing artwork automatically after a short
+   pause. Text and gameplay bars remain independently editable.
+6. Click **New** beside **Seed** to generate a fresh pattern. To reproduce a
+   design, enter the same integer seed and use the same material, frame, size,
+   wear, accent, visual style, and layout. Components receive coordinated but
+   distinct patterns. **Generate art** uses the displayed seed.
+7. Change the accent color to recolor the frame. Click **Clear** to remove all
+   artwork while keeping your custom positions and scales.
+
+![Procedural material examples](materials.png)
 
 Artwork is generated procedurally on your PC, without an AI service, account,
 or API key. It decorates panel components; the crosshair keeps its native shapes.
-Labels and bars stay editable, and exports include separate PNG files for the
-frames. Layout undo/redo applies to moving and resizing, not artwork changes.
+Exports include a separate PNG for each panel at twice its base dimensions,
+and `preset.json` records the material settings and seed. Copy the `art/` folder
+with the scene. Layout undo/redo applies to moving and resizing; it does not
+undo artwork changes. Export your design before starting another one.
 
 Changing game type, style, components, or resolution leaves a **Changes pending**
 message. Click **Generate** to apply those changes. Generate resets accent,

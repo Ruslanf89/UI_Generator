@@ -24,8 +24,10 @@ Headless checks do not validate a physical desktop or GPU.
 
 The suite also injects viewport mouse/key events for dragging, clamping,
 snapping, variant isolation, nudging, and undo/redo; rasterizes every artwork
-style/detail combination; and imports a moved, textured HUD into an independent
-game project. Generated frame PNGs use relative paths and need Godot's normal
+style/detail combination; checks all seven materials, seed reproducibility after
+cache eviction, texture size/wear changes, and live inspector updates; and imports
+a moved, textured HUD into an independent game project. Exported PNG pixels are
+compared with the preview. Generated material PNGs use relative paths and need Godot's normal
 image import before running a copied scene.
 
 In a cloud shell with a read-only home directory, initialize writable runtime
