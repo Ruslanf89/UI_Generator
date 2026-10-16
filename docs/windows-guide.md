@@ -74,6 +74,8 @@ extracted folder. Keep the whole app folder together when moving it.
 | Large central preview | The selected HUD variation over an illustrative background |
 | Three thumbnails below the preview | Balanced, Compact, and Cinematic layout options |
 | **The Finishing Touches**, on the right | Accent color, HUD size, and example health/mana values |
+| **Arrange Elements**, in the right panel | Selected component coordinates, grid snapping, and layout reset |
+| **Offline Frame Art**, in the right panel | Procedural artwork detail and Generate art / Clear buttons |
 | **New UI**, at the top | Resets the brief and customizations to the initial FPS/Military design |
 | **Export to Godot**, at the top | Saves the selected design into a new folder |
 | Status line, at the bottom | Generation messages, export location, and errors |
@@ -109,9 +111,44 @@ remain editable for every genre. At least one component must be selected.
 Accent, size, health, and mana changes appear immediately and carry into the
 export. They apply to all three generated variations.
 
+### Move components with your mouse
+
+1. Click a component in the **large central preview**, such as the health bar.
+   A green outline shows the selection; its design-canvas X/Y coordinates appear
+   under **Arrange Elements** on the right.
+2. Hold the left mouse button, drag the component, and release to keep its position.
+   The component stays inside the 1280 × 720 design canvas.
+3. Enable **Snap to 8 px grid** for aligned mouse placement.
+4. After selecting a component, use the **arrow keys** to move it 1 design pixel,
+   or **Shift+arrow** for 10 pixels.
+5. Use **Ctrl+Z** to undo a position edit; **Ctrl+Shift+Z** or **Ctrl+Y** redoes it.
+6. Click **Reset this layout** to return the current variation's components to
+   their preset positions. This reset can also be undone.
+
+Positions are stored separately for Balanced, Compact, and Cinematic. Switching
+variations keeps their edits. Changing color, size, or frame artwork keeps your
+positions; the exported scene uses those same positions. Thumbnails select
+variations; dragging is enabled in the large preview.
+
+### Generate decorative artwork offline
+
+1. Scroll the right-hand panel to **Offline Frame Art**.
+2. Choose **Style native**, **Ornate**, **Tech**, or **Weathered**.
+   Style native chooses details for the current visual style: for example,
+   filigree for Fantasy or technical borders for Sci-fi.
+3. Click **Generate art**. Frames appear behind the text and progress bars in
+   all three variations. Each click creates a new random seed.
+4. Change the accent color to recolor the frames while keeping the same seed.
+5. Click **Clear** to remove artwork and keep your custom positions.
+
+Artwork is generated procedurally on your PC, without an AI service, account,
+or API key. It decorates panel components; the crosshair keeps its native shapes.
+Labels and bars stay editable, and exports include separate PNG files for the
+frames. Layout undo/redo applies to position edits, not artwork changes.
+
 Changing game type, style, components, or resolution leaves a **Changes pending**
 message. Click **Generate** to apply those changes. Generate resets accent,
-size, and sample values to the chosen style's defaults, so refine those settings
+size, sample values, moved positions, and artwork to defaults, so refine those settings
 after generation. Export always uses the design currently visible in the preview.
 
 Keyboard shortcuts: **Ctrl+G** generates; **Ctrl+E** opens export.
@@ -136,6 +173,9 @@ UIForgeExports/
     hud_theme.tres
     preset.json
     README.md
+    art/                         # present when frame artwork was generated
+      health.png
+      ...other panel frames...
 ```
 
 Repeated exports create new folders with suffixes such as `_2`; they do not
@@ -147,6 +187,7 @@ overwrite previous exports.
 | `hud_theme.tres` | Shared styling; keep it beside `hud.tscn` |
 | `preset.json` | A record of your design choices and sample values |
 | `README.md` | Instructions included with this particular HUD |
+| `art/` (optional) | Generated PNG frames referenced by the scene; copy this folder too |
 
 Continue with [Add an exported HUD to your game](godot-guide.md#add-an-exported-hud-to-your-game).
 
@@ -171,6 +212,9 @@ background is illustrative and is not exported. Generation uses local templates.
 | Bottom controls are off screen | Maximize the app. Windows display resolution and scaling must leave enough room for the 1120 × 900 minimum window. Check **Settings → System → Display**. |
 | Mana or health slider is faded | Select that component on the left and click Generate. |
 | Changing style does not change the preview | Click Generate to apply the pending brief. |
+| Dragging a thumbnail does not move a component | Choose a variation, then drag its component in the large central preview. |
+| Artwork or arrangement controls are missing | Scroll inside the right-hand inspector panel. |
+| Art generation says it needs a panel | Include Health, Minimap, Weapon, or another panel component. The crosshair is made of native shapes. |
 | Export fails | Choose an existing writable folder, such as a folder in Documents. Read the status line for the specific error. |
 | Map or ammo is not changing in a game | Those are sample controls; follow the Godot integration guide and connect gameplay data. |
 

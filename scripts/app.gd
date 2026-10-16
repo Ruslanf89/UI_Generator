@@ -3,6 +3,7 @@ extends Control
 const Generator = preload("res://scripts/hud_generator.gd")
 const Exporter = preload("res://scripts/hud_exporter.gd")
 const Preview = preload("res://scripts/hud_preview.gd")
+const Art = preload("res://scripts/hud_art.gd")
 const INK = Color("edf1f3")
 const MUTED = Color("87959f")
 const GREEN = Color("b9ef77")
@@ -37,6 +38,9 @@ var export_button: Button
 var export_dialog: FileDialog
 var export_result: AcceptDialog
 var updating_controls = false
+var position_label: Label
+var layout_history = UndoRedo.new()
+var art_detail: OptionButton
 
 func _ready() -> void:
 	DisplayServer.window_set_min_size(Vector2i(1120, 900))
@@ -44,6 +48,9 @@ func _ready() -> void:
 	_build_ui()
 	_apply_genre_defaults()
 	generate()
+
+func _exit_tree() -> void:
+	layout_history.free()
 
 func _build_theme() -> void:
 	var app_theme = Theme.new()
@@ -237,11 +244,15 @@ func _center(parent: Node) -> void:
 	frame.add_theme_stylebox_override("panel", Generator.panel_style(Color("090f13"), BORDER, 1))
 	center.add_child(frame)
 	preview = Preview.new()
+	preview.editable = true
+	preview.element_selected.connect(_selection_changed)
+	preview.element_moving.connect(_position_changed)
+	preview.element_moved.connect(_commit_move)
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	frame.add_child(preview)
 	var preview_caption = HBoxContainer.new()
 	center.add_child(preview_caption)
-	var caption = _label("LIVE PREVIEW", 10, GREEN)
+	var caption = _label("DRAG TO ARRANGE", 10, GREEN)
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview_caption.add_child(caption)
 	preview_caption.add_child(_label("Illustrative environment · excluded from export", 10, MUTED))
@@ -286,14 +297,43 @@ func _center(parent: Node) -> void:
 	center.add_child(_label("Native controls. Shared theme. Ready for your game logic.", 12, MUTED))
 
 func _inspector(parent: Node) -> void:
-	var body = _panel(parent, 226)
+	var body = _panel(parent, 226, true)
 	body.add_theme_constant_override("separation", 7)
 	body.add_child(_label("THE FINISHING TOUCHES", 11, GREEN))
 	body.add_child(_label("Make it yours.", 21, INK))
-	body.add_child(_label("Changes appear in every variation.", 12, MUTED))
+	body.add_child(_wrapped("Color and artwork apply to all variations.", 12, MUTED))
 	_space(body, 9)
 	selected_label = _label("", 16, INK)
 	body.add_child(selected_label)
+	body.add_child(_label("ARRANGE ELEMENTS", 11, GREEN))
+	position_label = _label("Click an element in the preview", 11, MUTED)
+	body.add_child(position_label)
+	body.add_child(_wrapped("Drag to move · arrows to nudge\nShift + arrow: 10 px · Ctrl+Z: undo", 11, MUTED))
+	var snap = CheckBox.new()
+	snap.text = "Snap to 8 px grid"
+	snap.add_theme_font_size_override("font_size", 12)
+	snap.toggled.connect(func(enabled): preview.snap_to_grid = enabled)
+	body.add_child(snap)
+	var reset = _button("Reset this layout")
+	reset.pressed.connect(_reset_layout)
+	body.add_child(reset)
+	body.add_child(HSeparator.new())
+	body.add_child(_label("OFFLINE FRAME ART", 11, GREEN))
+	body.add_child(_wrapped("Generate decorative frames locally. Your text and bars stay editable.", 11, MUTED))
+	art_detail = OptionButton.new()
+	for detail in Art.DETAILS:
+		art_detail.add_item(detail)
+	body.add_child(art_detail)
+	var art_buttons = HBoxContainer.new()
+	art_buttons.add_theme_constant_override("separation", 6)
+	body.add_child(art_buttons)
+	var make_art = _button("Generate art")
+	make_art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	make_art.pressed.connect(_generate_art)
+	art_buttons.add_child(make_art)
+	var clear_art = _button("Clear")
+	clear_art.pressed.connect(_clear_art)
+	art_buttons.add_child(clear_art)
 	_space(body, 9)
 	body.add_child(_label("ACCENT COLOR", 11, MUTED))
 	accent_picker = ColorPickerButton.new()
@@ -353,6 +393,8 @@ func generate() -> void:
 	current_config = Generator.make_config(genre, selected_style)
 	current_config.components = selected
 	current_config.resolution = [Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(1280, 720)][resolution_picker.selected]
+	layout_history.clear_history()
+	preview.selected_element = ""
 	updating_controls = true
 	accent_picker.color = Color(current_config.accent)
 	size_slider.value = 100
@@ -382,11 +424,72 @@ func select_variant(index: int) -> void:
 	selected_label.text = names[index] + " / " + Generator.LAYOUTS[index]
 	detail_label.text = "%s · %s" % [current_config.genre.to_upper(), current_config.style.to_upper()]
 	preview.show_design(current_config, selected_variant)
+	_selection_changed(preview.selected_element)
 
 func _refresh_previews() -> void:
 	preview.show_design(current_config, selected_variant)
 	for i in range(3):
 		variant_previews[i].show_design(current_config, i)
+	_selection_changed(preview.selected_element)
+
+func _selection_changed(element: String) -> void:
+	if not is_instance_valid(position_label):
+		return
+	var node = preview.hud.get_node_or_null(NodePath(element)) if not element.is_empty() else null
+	if node != null:
+		_position_changed(element, node.position)
+	else:
+		position_label.text = "Click an element in the preview"
+
+func _position_changed(element: String, at: Vector2) -> void:
+	position_label.text = "%s  /  X %d  Y %d" % [element, at.x, at.y]
+
+func _commit_move(element: String, previous: Vector2, current: Vector2) -> void:
+	if previous.is_equal_approx(current):
+		return
+	layout_history.create_action("Move " + element)
+	layout_history.add_do_method(_apply_position.bind(selected_variant, element, current))
+	layout_history.add_undo_method(_apply_position.bind(selected_variant, element, previous))
+	layout_history.commit_action()
+
+func _apply_position(variant: int, element: String, at: Vector2) -> void:
+	var key = str(variant)
+	if not current_config.positions.has(key):
+		current_config.positions[key] = {}
+	current_config.positions[key][element] = at
+	preview.selected_element = element
+	select_variant(variant)
+	_refresh_previews()
+	status_label.text = "%s moved · export keeps this position. Ctrl+Z to undo." % element
+
+func _reset_layout() -> void:
+	var key = str(selected_variant)
+	var previous: Dictionary = current_config.positions.get(key, {}).duplicate(true)
+	if previous.is_empty():
+		return
+	layout_history.create_action("Reset layout")
+	layout_history.add_do_method(_restore_positions.bind(selected_variant, {}))
+	layout_history.add_undo_method(_restore_positions.bind(selected_variant, previous))
+	layout_history.commit_action()
+
+func _restore_positions(variant: int, positions: Dictionary) -> void:
+	current_config.positions[str(variant)] = positions.duplicate(true)
+	select_variant(variant)
+	_refresh_previews()
+	status_label.text = "Layout updated. Ctrl+Z to undo."
+
+func _generate_art() -> void:
+	if not preview.hud.get_children().any(func(node): return node is Panel):
+		status_label.text = "Frame art needs a panel component, such as Health or Weapon. The crosshair uses native shapes."
+		return
+	current_config.art = {"enabled": true, "seed": randi_range(0, 2147483647), "detail": Art.DETAILS[art_detail.selected], "strength": 0.85}
+	_refresh_previews()
+	status_label.text = "Generated %s frame art locally. Generate again for a new seed; export includes PNG assets." % current_config.art.detail.to_lower()
+
+func _clear_art() -> void:
+	current_config.art = {"enabled": false}
+	_refresh_previews()
+	status_label.text = "Frame art cleared. Custom element positions are kept."
 
 func _apply_genre_defaults() -> void:
 	var defaults: Array = Generator.DEFAULTS[Generator.GENRES[genre_picker.selected]]
@@ -441,6 +544,7 @@ func _new_ui() -> void:
 func _open_export() -> void:
 	if current_config.is_empty():
 		return
+	preview._finish_drag()
 	export_dialog.popup_centered_ratio(0.75)
 
 func _export_to(directory: String) -> void:
@@ -463,8 +567,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_E:
 			_open_export()
 			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_Z:
+			if event.shift_pressed:
+				layout_history.redo()
+			else:
+				layout_history.undo()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_Y:
+			layout_history.redo()
+			get_viewport().set_input_as_handled()
 
-func _panel(parent: Node, width: float) -> VBoxContainer:
+func _panel(parent: Node, width: float, scrollable: bool = false) -> VBoxContainer:
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size.x = width
 	parent.add_child(panel)
@@ -474,7 +587,15 @@ func _panel(parent: Node, width: float) -> VBoxContainer:
 	panel.add_child(margin)
 	var body = VBoxContainer.new()
 	body.add_theme_constant_override("separation", 10)
-	margin.add_child(body)
+	if scrollable:
+		var scroll = ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin.add_child(scroll)
+		scroll.add_child(body)
+	else:
+		margin.add_child(body)
 	return body
 
 func _label(text: String, font_size: int, color: Color) -> Label:

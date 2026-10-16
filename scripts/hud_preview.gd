@@ -2,6 +2,17 @@ extends Control
 ## The illustrative world is preview-only. The overlaid HUD is the real export.
 
 const Generator = preload("res://scripts/hud_generator.gd")
+signal element_selected(element: String)
+signal element_moving(element: String, at: Vector2)
+signal element_moved(element: String, previous: Vector2, current: Vector2)
+
+var editable = false
+var snap_to_grid = false
+var selected_element = ""
+var dragging = false
+var drag_offset = Vector2.ZERO
+var drag_start = Vector2.ZERO
+var selection_overlay: Control
 var hud: Control
 var config: Dictionary = {}
 var design_scale = 1.0
@@ -9,17 +20,30 @@ var origin = Vector2.ZERO
 
 func _ready() -> void:
 	clip_contents = true
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP if editable else Control.MOUSE_FILTER_IGNORE
+	focus_mode = Control.FOCUS_ALL if editable else Control.FOCUS_NONE
+	if editable:
+		selection_overlay = Control.new()
+		selection_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		selection_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		selection_overlay.draw.connect(_draw_selection)
+		add_child(selection_overlay)
 	resized.connect(_fit)
 	_fit()
 
 func show_design(settings: Dictionary, variant: int) -> void:
+	dragging = false
 	config = settings.duplicate(true)
 	if is_instance_valid(hud):
 		remove_child(hud)
 		hud.queue_free()
 	hud = Generator.build(config, variant)
+	_ignore_pointer(hud)
 	add_child(hud)
+	if is_instance_valid(selection_overlay):
+		move_child(selection_overlay, -1)
+	if not hud.has_node(NodePath(selected_element)) or selected_element.is_empty():
+		selected_element = ""
 	_fit()
 
 func _fit() -> void:
@@ -31,6 +55,97 @@ func _fit() -> void:
 		hud.size = Generator.CANVAS
 		hud.scale = Vector2.ONE * design_scale
 	queue_redraw()
+	_redraw_selection()
+
+func _ignore_pointer(node: Node) -> void:
+	if node is Control:
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in node.get_children():
+		_ignore_pointer(child)
+
+func _selected() -> Control:
+	if selected_element.is_empty() or not is_instance_valid(hud):
+		return null
+	return hud.get_node_or_null(NodePath(selected_element)) as Control
+
+func _hit_test(at: Vector2) -> Control:
+	if not is_instance_valid(hud):
+		return null
+	var children = hud.get_children()
+	children.reverse()
+	for child in children:
+		if Rect2(child.position, child.size * child.scale).has_point(at):
+			return child
+	return null
+
+func _gui_input(event: InputEvent) -> void:
+	if not editable or design_scale <= 0:
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			grab_focus()
+			var at = (event.position - origin) / design_scale
+			var element = _hit_test(at)
+			selected_element = str(element.name) if element != null else ""
+			element_selected.emit(selected_element)
+			if element != null:
+				dragging = true
+				drag_start = element.position
+				drag_offset = at - element.position
+		else:
+			_finish_drag()
+		_redraw_selection()
+		accept_event()
+	elif event is InputEventMouseMotion:
+		if dragging:
+			var element = _selected()
+			if element != null:
+				var at = (event.position - origin) / design_scale - drag_offset
+				if snap_to_grid:
+					at = at.snapped(Vector2(8, 8))
+				element.position = Generator.bound_position(element, at)
+				element_moving.emit(selected_element, element.position)
+				_redraw_selection()
+		else:
+			mouse_default_cursor_shape = Control.CURSOR_MOVE if _hit_test((event.position - origin) / design_scale) != null else Control.CURSOR_ARROW
+	elif event is InputEventKey and event.pressed and not event.is_command_or_control_pressed():
+		var direction = Vector2.ZERO
+		match event.keycode:
+			KEY_LEFT: direction = Vector2.LEFT
+			KEY_RIGHT: direction = Vector2.RIGHT
+			KEY_UP: direction = Vector2.UP
+			KEY_DOWN: direction = Vector2.DOWN
+		var element = _selected()
+		if element != null and direction != Vector2.ZERO:
+			var previous = element.position
+			element.position = Generator.bound_position(element, previous + direction * (10 if event.shift_pressed else 1))
+			element_moved.emit(selected_element, previous, element.position)
+			_redraw_selection()
+			accept_event()
+
+func _finish_drag() -> void:
+	var element = _selected()
+	var was_dragging = dragging
+	dragging = false
+	if was_dragging and element != null and not drag_start.is_equal_approx(element.position):
+		element_moved.emit(selected_element, drag_start, element.position)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_finish_drag()
+
+func _redraw_selection() -> void:
+	if is_instance_valid(selection_overlay):
+		selection_overlay.queue_redraw()
+
+func _draw_selection() -> void:
+	var element = _selected()
+	if element == null:
+		return
+	var rect = Rect2(origin + element.position * design_scale, element.size * element.scale * design_scale).grow(3)
+	selection_overlay.draw_rect(rect, Color("b9ef77"), false, 1.5)
+	for point in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
+		selection_overlay.draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("b9ef77"))
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("090f13"))

@@ -43,6 +43,21 @@ static func export_hud(config: Dictionary, variant: int, parent_directory: Strin
 	root.name = "Elements"
 	viewport.add_child(root)
 	Generator.assign_owners(scene_root, scene_root)
+	var art_resources: Array = []
+	for element in root.get_children():
+		var artwork = element.get_node_or_null("Art") as TextureRect
+		if artwork == null or artwork.texture == null:
+			continue
+		error = DirAccess.make_dir_recursive_absolute(folder.path_join("art"))
+		var relative = "art/" + str(element.name).to_snake_case() + ".png"
+		if error == OK:
+			error = artwork.texture.get_image().save_png(folder.path_join(relative))
+		if error != OK:
+			scene_root.free()
+			_remove_partial(folder)
+			return {"ok": false, "error": "Could not save generated artwork (error %d)." % error}
+		art_resources.append({"path": relative, "parent": "Canvas/Viewport/Design/Elements/" + str(element.name)})
+		artwork.texture = null
 	var theme_path = folder.path_join("hud_theme.tres")
 	var scene_path = folder.path_join("hud.tscn")
 	error = ResourceSaver.save(root.theme, theme_path)
@@ -65,10 +80,21 @@ static func export_hud(config: Dictionary, variant: int, parent_directory: Strin
 	var scene_text = file.get_as_text()
 	file.close()
 	var header_end = scene_text.find("\n")
-	scene_text = scene_text.insert(header_end + 1, "\n[ext_resource type=\"Theme\" path=\"hud_theme.tres\" id=\"1_theme\"]\n")
+	var resources = "\n[ext_resource type=\"Theme\" path=\"hud_theme.tres\" id=\"1_theme\"]\n"
+	for i in range(art_resources.size()):
+		resources += '[ext_resource type="Texture2D" path="%s" id="art_%d"]\n' % [art_resources[i].path, i]
+	scene_text = scene_text.insert(header_end + 1, resources)
 	var elements_header = scene_text.find("[node name=\"Elements\"")
 	var elements_header_end = scene_text.find("\n", elements_header)
 	scene_text = scene_text.insert(elements_header_end + 1, "theme = ExtResource(\"1_theme\")\n")
+	for i in range(art_resources.size()):
+		var marker = '[node name="Art" type="TextureRect" parent="%s"' % art_resources[i].parent
+		var node_start = scene_text.find(marker)
+		if node_start < 0:
+			_remove_partial(folder)
+			return {"ok": false, "error": "Could not attach the generated artwork to its HUD element."}
+		var node_end = scene_text.find("\n", node_start)
+		scene_text = scene_text.insert(node_end + 1, 'texture = ExtResource("art_%d")\n' % i)
 	file = FileAccess.open(scene_path, FileAccess.WRITE)
 	if file == null:
 		_remove_partial(folder)
@@ -79,6 +105,12 @@ static func export_hud(config: Dictionary, variant: int, parent_directory: Strin
 	manifest.resolution = {"width": config.resolution.x, "height": config.resolution.y}
 	manifest.variant = Generator.LAYOUTS[variant]
 	manifest.generator = "UI Forge 0.1"
+	manifest.positions = {}
+	for layout in config.get("positions", {}):
+		manifest.positions[layout] = {}
+		for element in config.positions[layout]:
+			var at: Vector2 = config.positions[layout][element]
+			manifest.positions[layout][element] = {"x": at.x, "y": at.y}
 	var files = {
 		"preset.json": JSON.stringify(manifest, "\t"),
 		"README.md": _instructions(config, variant),
@@ -94,6 +126,12 @@ static func export_hud(config: Dictionary, variant: int, parent_directory: Strin
 
 static func _remove_partial(folder: String) -> void:
 	# Only files inside the new export folder are ever removed on failure.
+	var art_folder = folder.path_join("art")
+	if DirAccess.dir_exists_absolute(art_folder):
+		for filename in DirAccess.get_files_at(art_folder):
+			if filename.ends_with(".png"):
+				DirAccess.remove_absolute(art_folder.path_join(filename))
+		DirAccess.remove_absolute(art_folder)
 	for filename in ["hud.tscn", "hud_theme.tres", "preset.json", "README.md"]:
 		DirAccess.remove_absolute(folder.path_join(filename))
 	DirAccess.remove_absolute(folder)
@@ -113,6 +151,7 @@ not the UI Forge desktop application. It contains native editable Control nodes.
    This opens the game folder containing your game's project.godot.
 3. Create a ui folder there, then copy this entire exported folder into it.
    Keep hud.tscn and hud_theme.tres beside each other.
+   If an art folder is included, copy it too; it contains generated frame PNGs.
 4. Return to Godot and wait for the new files to appear.
 5. Open your gameplay scene. Select its root and add a CanvasLayer child.
 6. Drag this folder's hud.tscn from FileSystem onto CanvasLayer in the Scene dock.
@@ -143,6 +182,9 @@ Right-click the HUD instance in the Scene dock and enable Editable Children.
 Its controls are below Canvas > Viewport > Design > Elements. Edit their text,
 position, or Theme Overrides in the Inspector. The Elements node uses the shared
 hud_theme.tres resource; changing that theme affects controls that use it.
+Custom mouse positions from UI Forge are already applied to the exported scene.
+Generated frame artwork is a TextureRect named Art within each panel. You can
+replace its texture or change its opacity without changing the labels and bars.
 
 ## Connect gameplay values
 

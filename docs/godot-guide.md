@@ -81,6 +81,7 @@ uiforge_fps_military_balanced/
   hud_theme.tres
   preset.json
   README.md
+  art/                          # optional generated panel PNGs
 ```
 
 ### 2. Copy the whole folder into your game
@@ -91,6 +92,8 @@ uiforge_fps_military_balanced/
 3. In File Explorer, create a folder named **ui** inside that game folder.
 4. Copy the complete exported folder into **ui**. Keep `hud.tscn` and
    `hud_theme.tres` together.
+   If the export has an **art** folder, copy it too and wait for Godot to import
+   its PNG files.
 5. Return to Godot and wait for the files to appear in the FileSystem dock.
 
 For example:
@@ -104,6 +107,7 @@ MyGame/                          <- your game's folder
       hud_theme.tres
       preset.json
       README.md
+      art/                      # included when frame art is enabled
 ```
 
 The scene's Godot path is now
@@ -135,6 +139,8 @@ Game                            <- your scene root; Node2D or Node3D is fine
 CanvasLayer keeps the HUD in screen space while the camera moves. The export
 is transparent, so UI Forge's illustrative background will not appear in your
 game. The minimap shows example geometry until you replace it with your map.
+Custom component positions from the designer are already applied. No dragging
+script is needed in your game to keep the arrangement.
 
 **For a new test project:** in Godot Project Manager, click **Create**, choose
 an empty folder and the Compatibility renderer, then open the project. Choose
@@ -232,6 +238,8 @@ HUD
 | Move a component | Edit its Control position in the exported `hud.tscn`, or override the child in your game scene. |
 | Update health or mana | Set its ProgressBar's `value`/`max_value` and update its `Amount` Label. |
 | Make a real minimap | Replace sample nodes in `Minimap/MapContent` with your map or camera-driven UI. |
+| Replace a generated frame | Select the component's `Art` TextureRect and change **Texture**, or edit its PNG under the export's `art/` folder. |
+| Change frame opacity | Select its `Art` TextureRect and change **Modulate** alpha under CanvasItem visibility. |
 
 These paths are relative to **Elements**. Only selected components exist:
 
@@ -263,6 +271,7 @@ already customized in Godot.
 | `project.godot` is missing | Extract the source ZIP and open its inner `UI_Generator-main` folder. A packaged app ZIP contains EXE/PCK files instead of the source project. |
 | A main-scene prompt in UI Forge | Choose `res://scenes/main.tscn`, then press F5. |
 | Missing theme or unstyled HUD | Copy the entire exported folder; keep the scene and theme together. |
+| Missing frame texture | Copy the export's `art/` folder too and let Godot finish importing its PNGs. |
 | `Node not found: CanvasLayer/HUD/...` | Check the exact node names, attach the example script to the parent Game node, and confirm Health bar was selected before export. |
 | Health stays at the sample value | Attach the script to the active test scene, run it with F6, and click the game view before pressing Space. |
 | The bar moves but the number does not | Update both `Health/Value` and `Health/Amount`. |

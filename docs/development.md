@@ -22,6 +22,12 @@ documented Space-to-damage / R-to-heal example. It exits
 nonzero on failure. Temporary export fixtures are written to the OS temp directory.
 Headless checks do not validate a physical desktop or GPU.
 
+The suite also injects viewport mouse/key events for dragging, clamping,
+snapping, variant isolation, nudging, and undo/redo; rasterizes every artwork
+style/detail combination; and imports a moved, textured HUD into an independent
+game project. Generated frame PNGs use relative paths and need Godot's normal
+image import before running a copied scene.
+
 In a cloud shell with a read-only home directory, initialize writable runtime
 locations before Godot commands:
 

@@ -1,5 +1,6 @@
 extends RefCounted
 ## Creates native, editable Godot controls. Generated scenes depend on no scripts.
+const Art = preload("res://scripts/hud_art.gd")
 
 const GENRES = ["FPS", "RPG", "RTS", "Racing", "Survival", "Platformer"]
 const STYLES = ["Military", "Fantasy", "Modern", "Horror", "Sci-fi", "Minimal"]
@@ -31,7 +32,7 @@ const CANVAS = Vector2(1280, 720)
 static func make_config(genre: String = "FPS", style: String = "Military") -> Dictionary:
 	return {"genre": genre, "style": style, "components": DEFAULTS[genre].duplicate(),
 		"accent": PALETTES[style].accent, "scale": 1.0, "health": 78.0, "mana": 62.0,
-		"resolution": Vector2i(1920, 1080)}
+		"resolution": Vector2i(1920, 1080), "positions": {}, "art": {"enabled": false}}
 
 static func panel_style(bg: Color, border: Color, radius: int = 4, width: int = 1) -> StyleBoxFlat:
 	var box = StyleBoxFlat.new()
@@ -92,6 +93,19 @@ static func component(root: Control, node_name: String, at: Vector2, dimensions:
 	result.position = at
 	result.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(result)
+	if config.get("art", {}).get("enabled", false):
+		var art_settings = config.duplicate()
+		art_settings.panel = PALETTES[config.style].panel
+		var texture = Art.make_texture(art_settings, dimensions, node_name, variant)
+		if texture != null:
+			var artwork = TextureRect.new()
+			artwork.name = "Art"
+			artwork.texture = texture
+			artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			artwork.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			artwork.modulate.a = config.art.get("strength", 0.85)
+			artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			result.add_child(artwork)
 	if variant == 0:
 		block(result, "AccentEdge", Rect2(0, 12, 3, dimensions.y - 24), Color(config.accent))
 	return result
@@ -209,8 +223,16 @@ static func build(config: Dictionary, variant: int = 0) -> Control:
 		for i in range(3):
 			block(squad, "Unit%d" % i, Rect2(16 + i * 86, 43, 70, 3), accent)
 			label_at(squad, "UnitName%d" % i, ["SCOUT", "MEDIC", "HEAVY"][i], Rect2(16 + i * 86, 58, 76, 24), 12)
+	var positions: Dictionary = config.get("positions", {}).get(str(variant), {})
+	for child in root.get_children():
+		if positions.has(str(child.name)):
+			child.position = bound_position(child, positions[str(child.name)])
 	assign_owners(root, root)
 	return root
+
+static func bound_position(element: Control, requested: Vector2) -> Vector2:
+	var maximum = (CANVAS - element.size * element.scale).max(Vector2.ZERO)
+	return requested.clamp(Vector2.ZERO, maximum)
 
 static func assign_owners(node: Node, root: Node) -> void:
 	for child in node.get_children():
