@@ -248,6 +248,7 @@ func _center(parent: Node) -> void:
 	preview.element_selected.connect(_selection_changed)
 	preview.element_moving.connect(_position_changed)
 	preview.element_moved.connect(_commit_move)
+	preview.element_resized.connect(_commit_resize)
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	frame.add_child(preview)
 	var preview_caption = HBoxContainer.new()
@@ -297,7 +298,7 @@ func _center(parent: Node) -> void:
 	center.add_child(_label("Native controls. Shared theme. Ready for your game logic.", 12, MUTED))
 
 func _inspector(parent: Node) -> void:
-	var body = _panel(parent, 226, true)
+	var body = _panel(parent, 246, true)
 	body.add_theme_constant_override("separation", 7)
 	body.add_child(_label("THE FINISHING TOUCHES", 11, GREEN))
 	body.add_child(_label("Make it yours.", 21, INK))
@@ -308,7 +309,7 @@ func _inspector(parent: Node) -> void:
 	body.add_child(_label("ARRANGE ELEMENTS", 11, GREEN))
 	position_label = _label("Click an element in the preview", 11, MUTED)
 	body.add_child(position_label)
-	body.add_child(_wrapped("Drag to move · arrows to nudge\nShift + arrow: 10 px · Ctrl+Z: undo", 11, MUTED))
+	body.add_child(_wrapped("Drag to move · corners to resize\nArrows: nudge · Ctrl+Z: undo\nEsc: cancel an active drag", 11, MUTED))
 	var snap = CheckBox.new()
 	snap.text = "Snap to 8 px grid"
 	snap.add_theme_font_size_override("font_size", 12)
@@ -442,7 +443,9 @@ func _selection_changed(element: String) -> void:
 		position_label.text = "Click an element in the preview"
 
 func _position_changed(element: String, at: Vector2) -> void:
-	position_label.text = "%s  /  X %d  Y %d" % [element, at.x, at.y]
+	var node = preview.hud.get_node_or_null(NodePath(element))
+	var factor = node.scale.x / float(node.get_meta("preset_scale", 1.0)) if node != null else 1.0
+	position_label.text = "%s  /  %d%%\nX %d  Y %d" % [element, roundi(factor * 100), at.x, at.y]
 
 func _commit_move(element: String, previous: Vector2, current: Vector2) -> void:
 	if previous.is_equal_approx(current):
@@ -462,18 +465,34 @@ func _apply_position(variant: int, element: String, at: Vector2) -> void:
 	_refresh_previews()
 	status_label.text = "%s moved · export keeps this position. Ctrl+Z to undo." % element
 
+func _commit_resize(element: String, previous_position: Vector2, previous_scale: float, current_position: Vector2, current_scale: float) -> void:
+	layout_history.create_action("Resize " + element)
+	layout_history.add_do_method(_apply_transform.bind(selected_variant, element, current_position, current_scale))
+	layout_history.add_undo_method(_apply_transform.bind(selected_variant, element, previous_position, previous_scale))
+	layout_history.commit_action()
+
+func _apply_transform(variant: int, element: String, at: Vector2, factor: float) -> void:
+	var key = str(variant)
+	if not current_config.element_scales.has(key):
+		current_config.element_scales[key] = {}
+	current_config.element_scales[key][element] = factor
+	_apply_position(variant, element, at)
+	status_label.text = "%s resized · export keeps its size and position. Ctrl+Z to undo." % element
+
 func _reset_layout() -> void:
 	var key = str(selected_variant)
 	var previous: Dictionary = current_config.positions.get(key, {}).duplicate(true)
-	if previous.is_empty():
+	var previous_scales: Dictionary = current_config.element_scales.get(key, {}).duplicate(true)
+	if previous.is_empty() and previous_scales.is_empty():
 		return
 	layout_history.create_action("Reset layout")
-	layout_history.add_do_method(_restore_positions.bind(selected_variant, {}))
-	layout_history.add_undo_method(_restore_positions.bind(selected_variant, previous))
+	layout_history.add_do_method(_restore_layout.bind(selected_variant, {}, {}))
+	layout_history.add_undo_method(_restore_layout.bind(selected_variant, previous, previous_scales))
 	layout_history.commit_action()
 
-func _restore_positions(variant: int, positions: Dictionary) -> void:
+func _restore_layout(variant: int, positions: Dictionary, scales: Dictionary) -> void:
 	current_config.positions[str(variant)] = positions.duplicate(true)
+	current_config.element_scales[str(variant)] = scales.duplicate(true)
 	select_variant(variant)
 	_refresh_previews()
 	status_label.text = "Layout updated. Ctrl+Z to undo."

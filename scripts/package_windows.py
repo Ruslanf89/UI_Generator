@@ -48,12 +48,14 @@ CREATE YOUR FIRST HUD
    offers an 8 px grid and layout reset. Arrows nudge 1 px; Shift+arrow nudges 10.
    Ctrl+Z undoes movement; Ctrl+Shift+Z or Ctrl+Y redoes it. Each variation keeps
    its own positions.
+   Drag a selected component's corner handles to rescale it proportionally.
+   Resizing supports undo/redo; Esc cancels an unfinished move or resize.
 7. Under Offline Frame Art, choose a detail and click Generate art for new
    procedural panel frames. Scroll the right panel to reach its tools. Clear
    removes artwork while preserving positions. No AI service or key is needed.
 
 Changing genre, style, components, or resolution requires Generate to apply.
-Generate resets color, size, sample values, moved positions, and artwork. Apply those
+Generate resets color, size, sample values, component positions/scales, and artwork. Apply those
 customizations after generating. Export always uses the visible design.
 
 EXPORT AND USE IN GODOT
@@ -62,7 +64,7 @@ EXPORT AND USE IN GODOT
 3. Read the success message for the new output subfolder's path.
 4. Keep all four output files together: hud.tscn, hud_theme.tres, preset.json,
    and README.md. If an art folder is present, copy it too. Repeated exports
-   create separate folders. The scene keeps the positions from your preview.
+   create separate folders. The scene keeps component positions and scales.
 5. Open your game's Godot 4.6+ project. Copy the whole exported folder into it.
 6. Add a CanvasLayer under the game scene's root. Drag hud.tscn onto it.
 7. Save and run the game scene. Connect the controls to your gameplay values.

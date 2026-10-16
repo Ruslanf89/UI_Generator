@@ -139,8 +139,8 @@ Game                            <- your scene root; Node2D or Node3D is fine
 CanvasLayer keeps the HUD in screen space while the camera moves. The export
 is transparent, so UI Forge's illustrative background will not appear in your
 game. The minimap shows example geometry until you replace it with your map.
-Custom component positions from the designer are already applied. No dragging
-script is needed in your game to keep the arrangement.
+Custom component positions and individual scales from the designer are already
+applied. No dragging or resizing script is needed in your game to keep the layout.
 
 **For a new test project:** in Godot Project Manager, click **Create**, choose
 an empty folder and the Compatibility renderer, then open the project. Choose

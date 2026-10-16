@@ -39,8 +39,9 @@ project rather than a ready-to-run Windows executable.
 4. Choose a target resolution and click **Generate 3 variations**.
 5. Click a variation's thumbnail or name. Change the accent color and HUD size
    on the right. Health and mana sliders preview the selected bars.
-6. Drag components in the large preview to arrange them. Optional snapping,
-   keyboard nudging, undo/redo, and **Reset this layout** help refine placement.
+6. Drag components in the large preview to arrange them, then drag a selected
+   component's corner handles to rescale it. Optional snapping, keyboard
+   nudging, undo/redo, and **Reset this layout** help refine placement.
 7. In **Offline Frame Art** on the right, choose a detail style and click
    **Generate art** for decorative panel artwork. Scroll the right panel if needed.
 8. Click **Export to Godot** and select an existing folder to save into.
@@ -50,14 +51,15 @@ The app creates a new folder containing `hud.tscn`, `hud_theme.tres`,
 your game's Godot project, then follow the
 [step-by-step Godot import guide](docs/godot-guide.md#add-an-exported-hud-to-your-game).
 When artwork is enabled, the folder also includes generated PNGs under `art/`.
-The exported scene keeps your custom element positions.
+The exported scene keeps your custom element positions and individual scales.
 
 ## What this version provides
 
 - Six game types: FPS, RPG, RTS, Racing, Survival, and Platformer.
 - Six styles: Military, Fantasy, Modern, Horror, Sci-fi, and Minimal.
 - Twelve optional HUD components and three coordinated layout variations.
-- Mouse placement per variation, optional 8 px snapping, arrow-key nudging,
+- Mouse placement and proportional corner resizing per variation, optional
+  8 px snapping, arrow-key nudging,
   undo/redo, and preset layout reset.
 - Offline, seeded frame artwork with style-native, ornate, tech, and weathered details.
 - Editable native Godot controls and a shared theme, with no generator plugin
@@ -70,10 +72,9 @@ it does not use an AI image service or require a key.
 
 Designs are held in memory. **Export before closing the app or clicking New UI.**
 Changing the brief requires Generate to apply; Generate resets the current
-color, size, sample values, mouse positions, and generated artwork. Existing
-exports are kept in
-separate folders. Loading exported presets back into the designer is not
-implemented.
+color, size, sample values, component positions/scales, and generated artwork.
+Existing exports are kept in separate folders. Loading exported presets back
+into the designer is not implemented.
 
 The app and exports target **Godot 4.6+**, tested with **4.6.3**. The packaged
 desktop targets Windows x64 with OpenGL 3.3-compatible graphics and needs space

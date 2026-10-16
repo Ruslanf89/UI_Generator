@@ -28,11 +28,13 @@ const PALETTES = {
 }
 const LAYOUTS = ["Balanced", "Compact", "Cinematic"]
 const CANVAS = Vector2(1280, 720)
+const MIN_ELEMENT_SCALE = 0.35
+const MAX_ELEMENT_SCALE = 3.0
 
 static func make_config(genre: String = "FPS", style: String = "Military") -> Dictionary:
 	return {"genre": genre, "style": style, "components": DEFAULTS[genre].duplicate(),
 		"accent": PALETTES[style].accent, "scale": 1.0, "health": 78.0, "mana": 62.0,
-		"resolution": Vector2i(1920, 1080), "positions": {}, "art": {"enabled": false}}
+		"resolution": Vector2i(1920, 1080), "positions": {}, "element_scales": {}, "art": {"enabled": false}}
 
 static func panel_style(bg: Color, border: Color, radius: int = 4, width: int = 1) -> StyleBoxFlat:
 	var box = StyleBoxFlat.new()
@@ -224,9 +226,15 @@ static func build(config: Dictionary, variant: int = 0) -> Control:
 			block(squad, "Unit%d" % i, Rect2(16 + i * 86, 43, 70, 3), accent)
 			label_at(squad, "UnitName%d" % i, ["SCOUT", "MEDIC", "HEAVY"][i], Rect2(16 + i * 86, 58, 76, 24), 12)
 	var positions: Dictionary = config.get("positions", {}).get(str(variant), {})
+	var scales: Dictionary = config.get("element_scales", {}).get(str(variant), {})
 	for child in root.get_children():
+		child.set_meta("preset_scale", child.scale.x)
+		var factor = clampf(float(scales.get(str(child.name), 1.0)), MIN_ELEMENT_SCALE, MAX_ELEMENT_SCALE)
+		var maximum = minf(CANVAS.x / child.size.x, CANVAS.y / child.size.y)
+		child.scale = Vector2.ONE * minf(child.scale.x * factor, maximum)
 		if positions.has(str(child.name)):
-			child.position = bound_position(child, positions[str(child.name)])
+			child.position = positions[str(child.name)]
+		child.position = bound_position(child, child.position)
 	assign_owners(root, root)
 	return root
 

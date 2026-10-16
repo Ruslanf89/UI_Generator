@@ -182,7 +182,7 @@ Right-click the HUD instance in the Scene dock and enable Editable Children.
 Its controls are below Canvas > Viewport > Design > Elements. Edit their text,
 position, or Theme Overrides in the Inspector. The Elements node uses the shared
 hud_theme.tres resource; changing that theme affects controls that use it.
-Custom mouse positions from UI Forge are already applied to the exported scene.
+Custom mouse positions and component scales are already applied to the scene.
 Generated frame artwork is a TextureRect named Art within each panel. You can
 replace its texture or change its opacity without changing the labels and bars.
 

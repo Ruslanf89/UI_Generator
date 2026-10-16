@@ -123,12 +123,30 @@ export. They apply to all three generated variations.
    or **Shift+arrow** for 10 pixels.
 5. Use **Ctrl+Z** to undo a position edit; **Ctrl+Shift+Z** or **Ctrl+Y** redoes it.
 6. Click **Reset this layout** to return the current variation's components to
-   their preset positions. This reset can also be undone.
+   their preset positions and sizes. This reset can also be undone.
+
+### Rescale a component with your mouse
+
+1. Click a component in the large preview to select it.
+2. Hover over one of its four green corner handles. The cursor changes to a
+   diagonal resize arrow.
+3. Hold the left mouse button and drag the corner outward to enlarge the
+   component, or inward to shrink it.
+4. Release to keep the size. Text, bars, icons, and artwork scale together,
+   preserving the component's proportions. The opposite corner stays fixed.
+5. Read the selected component's percentage under **Arrange Elements**.
+6. Press **Ctrl+Z** to undo the resize, or **Ctrl+Shift+Z** / **Ctrl+Y** to redo.
+   Press **Esc** during a move or resize to cancel that unfinished gesture.
+
+Individual scales range from 35% to 300% of the preset size. Canvas edges may
+limit enlargement; move the component away from an edge for more room. With
+**Snap to 8 px grid**, resizing snaps the width while preserving proportions.
+The **HUD Size** slider scales the overall design on top of individual scales.
 
 Positions are stored separately for Balanced, Compact, and Cinematic. Switching
-variations keeps their edits. Changing color, size, or frame artwork keeps your
-positions; the exported scene uses those same positions. Thumbnails select
-variations; dragging is enabled in the large preview.
+variations keeps their edits. Changing color or frame artwork keeps custom
+positions and scales; the exported scene uses the same arrangement. Thumbnails
+select variations; dragging is enabled in the large preview.
 
 ### Generate decorative artwork offline
 
@@ -144,12 +162,12 @@ variations; dragging is enabled in the large preview.
 Artwork is generated procedurally on your PC, without an AI service, account,
 or API key. It decorates panel components; the crosshair keeps its native shapes.
 Labels and bars stay editable, and exports include separate PNG files for the
-frames. Layout undo/redo applies to position edits, not artwork changes.
+frames. Layout undo/redo applies to moving and resizing, not artwork changes.
 
 Changing game type, style, components, or resolution leaves a **Changes pending**
 message. Click **Generate** to apply those changes. Generate resets accent,
-size, sample values, moved positions, and artwork to defaults, so refine those settings
-after generation. Export always uses the design currently visible in the preview.
+size, sample values, component positions/scales, and artwork to defaults, so
+refine those settings after generation. Export always uses the visible design.
 
 Keyboard shortcuts: **Ctrl+G** generates; **Ctrl+E** opens export.
 

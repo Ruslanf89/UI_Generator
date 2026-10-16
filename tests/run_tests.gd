@@ -4,6 +4,7 @@ extends SceneTree
 const Generator = preload("res://scripts/hud_generator.gd")
 const Exporter = preload("res://scripts/hud_exporter.gd")
 const Art = preload("res://scripts/hud_art.gd")
+const GitUpdate = preload("res://addons/ui_forge_git/git_update.gd")
 var failures: Array[String] = []
 var checks = 0
 var scratch: String
@@ -26,9 +27,11 @@ func _run() -> void:
 	_test_combinations()
 	await _test_editor()
 	await _test_dragging_and_art()
+	await _test_resizing()
 	await _test_export()
 	_test_art_variations()
 	await _test_art_export()
+	_test_git_updates()
 	if failures.is_empty():
 		print("PASS: %d checks. Generated 108 genre/style/layout combinations; exercised editor and portable exports." % checks)
 		quit(0)
@@ -291,9 +294,86 @@ func _test_art_variations() -> void:
 	first.free()
 	second.free()
 
+func _resize(app: Control, corner: int, delta: Vector2) -> void:
+	var from: Vector2 = app.preview._handle_positions()[corner]
+	var to = from + delta * app.preview.design_scale
+	_pointer(app, from, true)
+	_pointer(app, to, true, true)
+	_pointer(app, to, false)
+
+func _test_resizing() -> void:
+	var app = load("res://scenes/main.tscn").instantiate()
+	root.add_child(app)
+	await process_frame
+	await process_frame
+	var initial = Vector2(400, 300)
+	for corner in range(4):
+		app._apply_transform(0, "Health", initial, 1.0)
+		app.layout_history.clear_history()
+		var node = app.preview.hud.get_node("Health")
+		var opposite: Vector2 = Vector2.ONE - app.preview.CORNERS[corner]
+		var anchor: Vector2 = node.position + node.size * node.scale * opposite
+		var delta: Vector2 = node.size * (app.preview.CORNERS[corner] * 2 - Vector2.ONE) * 0.5
+		_resize(app, corner, delta)
+		node = app.preview.hud.get_node("Health")
+		check(node.scale.is_equal_approx(Vector2(1.5, 1.5)), "Corner %d uniformly rescales the component with real viewport mouse events" % corner)
+		check((node.position + node.size * node.scale * opposite).is_equal_approx(anchor), "Corner %d keeps the opposite corner fixed" % corner)
+		check(is_equal_approx(app.current_config.element_scales["0"].Health, 1.5), "Corner %d saves the individual scale" % corner)
+		_key(KEY_Z, true)
+		node = app.preview.hud.get_node("Health")
+		check(node.scale.is_equal_approx(Vector2.ONE) and node.position.is_equal_approx(initial), "Undo restores both position and scale")
+		_key(KEY_Z, true, true)
+		check(app.preview.hud.get_node("Health").scale.is_equal_approx(Vector2(1.5, 1.5)), "Redo reapplies the resize")
+	app._apply_transform(0, "Health", initial, 1.0)
+	app.layout_history.clear_history()
+	var handle: Vector2 = app.preview._handle_positions()[2]
+	_pointer(app, handle, true)
+	_pointer(app, handle + Vector2(140, 32) * app.preview.design_scale, true, true)
+	_key(KEY_ESCAPE)
+	_pointer(app, handle, false)
+	check(app.preview.hud.get_node("Health").scale.is_equal_approx(Vector2.ONE) and not app.layout_history.has_undo(), "Escape cancels an active resize without creating an action")
+	_resize(app, 2, Vector2(5000, 5000))
+	var node = app.preview.hud.get_node("Health")
+	check(is_equal_approx(node.scale.x, 3.0) and Rect2(Vector2.ZERO, Generator.CANVAS).encloses(Rect2(node.position, node.size * node.scale)), "An extreme outward resize respects maximum scale and canvas bounds")
+	app._apply_transform(0, "Health", initial, 1.0)
+	_resize(app, 2, Vector2(-5000, -5000))
+	check(is_equal_approx(app.preview.hud.get_node("Health").scale.x, 0.35), "An extreme inward resize keeps a positive minimum size")
+	app._apply_transform(0, "Health", Vector2(980, 640), 1.0)
+	_resize(app, 2, Vector2(5000, 5000))
+	node = app.preview.hud.get_node("Health")
+	check(Rect2(Vector2.ZERO, Generator.CANVAS).encloses(Rect2(node.position, node.size * node.scale)), "Resizing near the edge keeps the complete component inside the canvas")
+	app._apply_transform(0, "Health", initial, 1.0)
+	app.preview.snap_to_grid = true
+	_resize(app, 2, Vector2(37, 11))
+	var resized = app.preview.hud.get_node("Health")
+	var saved_factor: float = resized.scale.x
+	var resized_width: float = resized.size.x * resized.scale.x
+	check(is_equal_approx(resized_width, snappedf(resized_width, 8)) and is_equal_approx(resized.scale.x, resized.scale.y), "Resize snapping aligns width while preserving proportions")
+	app.select_variant(1)
+	check(app.preview.hud.get_node("Health").scale == Vector2.ONE, "A resize leaves other variation sizes intact")
+	app.select_variant(0)
+	check(is_equal_approx(app.preview.hud.get_node("Health").scale.x, saved_factor), "Switching variations retains custom sizes")
+	app.size_slider.value = 110
+	check(is_equal_approx(app.preview.hud.get_node("Health").scale.x, saved_factor * 1.1), "HUD Size multiplies individual component scales")
+	app._generate_art()
+	check(is_equal_approx(app.preview.hud.get_node("Health").scale.x, saved_factor * 1.1), "Generating art preserves individual sizes")
+	app._reset_layout()
+	check(is_equal_approx(app.preview.hud.get_node("Health").scale.x, 1.1), "Reset layout restores preset component sizes")
+	app.layout_history.undo()
+	check(is_equal_approx(app.preview.hud.get_node("Health").scale.x, saved_factor * 1.1), "Undo reset restores custom component sizes")
+	app.preview.snap_to_grid = false
+	app._apply_transform(0, "Crosshair", Vector2(600, 350), 1.6)
+	_resize(app, 2, Vector2(32, 32) * 1.6 * 0.25)
+	check(is_equal_approx(app.preview.hud.get_node("Crosshair").scale.x, 2.0), "Native crosshair shapes can be resized independently")
+	app.generate()
+	check(app.current_config.element_scales.is_empty(), "Generate clears old per-component scales")
+	app.queue_free()
+	await process_frame
+
 func _test_art_export() -> void:
 	var config = Generator.make_config("RPG", "Fantasy")
 	config.positions = {"2": {"Health": Vector2(320, 430), "Minimap": Vector2(850, 90)}}
+	config.element_scales = {"2": {"Health": 1.75, "Minimap": 0.8}}
 	config.art = {"enabled": true, "seed": 3210, "detail": "Ornate", "strength": 0.7}
 	var result = Exporter.export_hud(config, 2, scratch)
 	check(result.ok, "Custom-position HUD with generated art exports")
@@ -307,6 +387,7 @@ func _test_art_export() -> void:
 	check(scene_text.contains('path="art/health.png"') and not scene_text.contains("/tmp/"), "Artwork uses portable relative resource paths")
 	var manifest = JSON.parse_string(FileAccess.get_file_as_string(result.path.path_join("preset.json")))
 	check(manifest.positions["2"].Health.x == 320 and manifest.positions["2"].Health.y == 430 and manifest.art.seed == 3210, "Preset records numeric custom positions and reproducible art settings")
+	check(is_equal_approx(manifest.element_scales["2"].Health, 1.75), "Preset records individual component scales")
 	var game = scratch.path_join("art_game")
 	DirAccess.make_dir_recursive_absolute(game.path_join("hud/art"))
 	for filename in ["hud.tscn", "hud_theme.tres"]:
@@ -330,6 +411,9 @@ func verify():
     if artwork.texture == null or artwork.texture.get_width() != 560 or not is_equal_approx(artwork.modulate.a, 0.7):
         quit(2)
         return
+    if not is_equal_approx(health.scale.x, 1.75) or not is_equal_approx(elements.get_node("Minimap").scale.x, 0.8):
+        quit(4)
+        return
     health.get_node("Value").value = 47
     if health.get_node("Value").value != 47:
         quit(3)
@@ -343,6 +427,58 @@ func verify():
 	output.clear()
 	var exit_code = OS.execute(OS.get_executable_path(), ["--headless", "--path", game, "--script", "verify.gd"], output, true)
 	check(exit_code == 0 and str(output).contains("ART_EXPORT_OK") and not str(output).contains("ERROR:"), "Independent game loads custom positions and art while retaining live controls: " + str(output))
+
+func _git(directory: String, args: Array) -> Dictionary:
+	return GitUpdate._run(GitUpdate.find_git(), directory, args)
+
+func _git_commit(directory: String, title: String) -> bool:
+	if _git(directory, ["add", "."]).code != 0:
+		return false
+	return _git(directory, ["-c", "user.name=UI Forge Test", "-c", "user.email=test@example.invalid", "commit", "-m", title]).code == 0
+
+func _test_git_updates() -> void:
+	var fixture = scratch.path_join("git fixtures")
+	DirAccess.make_dir_recursive_absolute(fixture)
+	var bare = fixture.path_join("remote.git")
+	var source = fixture.path_join("source")
+	var checkout = fixture.path_join("checkout")
+	check(_git(fixture, ["init", "--bare", "--initial-branch=main", bare]).code == 0, "Create an isolated local remote for update checks")
+	check(_git(fixture, ["init", "--initial-branch=main", source]).code == 0, "Create update fixture history")
+	_write(source.path_join("project.godot"), "config_version=5\n")
+	_write(source.path_join("tracked.txt"), "first\n")
+	check(_git_commit(source, "Initial fixture"), "Commit fixture without changing global Git identity")
+	check(_git(source, ["remote", "add", "origin", bare]).code == 0 and _git(source, ["push", "origin", "main"]).code == 0, "Publish fixture history to local remote")
+	check(_git(fixture, ["clone", bare, checkout]).code == 0, "Create an existing main checkout")
+	var current = GitUpdate.update_checkout(checkout)
+	check(current.ok, "Updating an already-current clean clone succeeds")
+	_write(source.path_join("tracked.txt"), "upstream update\n")
+	check(_git_commit(source, "Upstream change") and _git(source, ["push", "origin", "main"]).code == 0, "Prepare a fast-forward update")
+	var pulled = GitUpdate.update_checkout(checkout)
+	check(pulled.ok and FileAccess.get_file_as_string(checkout.path_join("tracked.txt")) == "upstream update\n", "Editor update service pulls a fast-forward through paths containing spaces")
+	_write(checkout.path_join("tracked.txt"), "my unsaved-on-Git edits\n")
+	var dirty = GitUpdate.update_checkout(checkout)
+	check(not dirty.ok and FileAccess.get_file_as_string(checkout.path_join("tracked.txt")) == "my unsaved-on-Git edits\n", "Tracked edits block updates and are preserved")
+	_write(checkout.path_join("tracked.txt"), "upstream update\n")
+	_write(checkout.path_join("personal.txt"), "keep me\n")
+	check(not GitUpdate.update_checkout(checkout).ok and FileAccess.file_exists(checkout.path_join("personal.txt")), "Untracked personal files block automatic pulls and remain present")
+	DirAccess.remove_absolute(checkout.path_join("personal.txt"))
+	_git(checkout, ["switch", "-c", "my-branch"])
+	check(not GitUpdate.update_checkout(checkout).ok and _git(checkout, ["branch", "--show-current"]).output == "my-branch", "Updating never switches a user's feature branch")
+	_git(checkout, ["switch", "main"])
+	var nested = checkout.path_join("nested")
+	DirAccess.make_dir_recursive_absolute(nested)
+	check(not GitUpdate.update_checkout(nested).ok, "A project nested under another repository is rejected")
+	DirAccess.remove_absolute(nested)
+	var zip_project = fixture.path_join("zip_project")
+	DirAccess.make_dir_recursive_absolute(zip_project)
+	_write(zip_project.path_join("project.godot"), "config_version=5\n")
+	check(not GitUpdate.update_checkout(zip_project).ok, "Source ZIPs get a clone-required result without modification")
+	_write(checkout.path_join("local.txt"), "local commit\n")
+	check(_git_commit(checkout, "Local work"), "Create local-only commit for divergence protection")
+	var before: String = _git(checkout, ["rev-parse", "HEAD"]).output
+	_write(source.path_join("upstream.txt"), "new upstream commit\n")
+	check(_git_commit(source, "New upstream work") and _git(source, ["push", "origin", "main"]).code == 0, "Prepare divergent remote history")
+	check(not GitUpdate.update_checkout(checkout).ok and _git(checkout, ["rev-parse", "HEAD"]).output == before and FileAccess.file_exists(checkout.path_join("local.txt")), "Divergence cannot trigger a merge, reset, or loss of local commits")
 
 func _write(path: String, text: String) -> void:
 	var file = FileAccess.open(path, FileAccess.WRITE)

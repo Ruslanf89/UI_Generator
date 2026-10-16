@@ -5,11 +5,19 @@ const Generator = preload("res://scripts/hud_generator.gd")
 signal element_selected(element: String)
 signal element_moving(element: String, at: Vector2)
 signal element_moved(element: String, previous: Vector2, current: Vector2)
+signal element_resized(element: String, previous_position: Vector2, previous_scale: float, current_position: Vector2, current_scale: float)
+const CORNERS = [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 
 var editable = false
 var snap_to_grid = false
 var selected_element = ""
 var dragging = false
+var resizing = false
+var resize_corner = -1
+var resize_pointer_start = Vector2.ZERO
+var resize_start_position = Vector2.ZERO
+var resize_start_scale = Vector2.ONE
+var resize_anchor = Vector2.ZERO
 var drag_offset = Vector2.ZERO
 var drag_start = Vector2.ZERO
 var selection_overlay: Control
@@ -33,6 +41,7 @@ func _ready() -> void:
 
 func show_design(settings: Dictionary, variant: int) -> void:
 	dragging = false
+	resizing = false
 	config = settings.duplicate(true)
 	if is_instance_valid(hud):
 		remove_child(hud)
@@ -78,6 +87,61 @@ func _hit_test(at: Vector2) -> Control:
 			return child
 	return null
 
+func _handle_positions() -> Array[Vector2]:
+	var element = _selected()
+	var points: Array[Vector2] = []
+	if element == null:
+		return points
+	var rect = Rect2(origin + element.position * design_scale, element.size * element.scale * design_scale).grow(3)
+	for corner in CORNERS:
+		points.append((rect.position + rect.size * corner).clamp(Vector2(4, 4), (size - Vector2(4, 4)).max(Vector2(4, 4))))
+	return points
+
+func _handle_at(at: Vector2) -> int:
+	var handles = _handle_positions()
+	var nearest = -1
+	var distance = 8.0
+	for i in range(handles.size()):
+		var candidate = handles[i].distance_to(at)
+		if candidate < distance:
+			distance = candidate
+			nearest = i
+	return nearest
+
+func _resize_to(at: Vector2) -> void:
+	var element = _selected()
+	if element == null:
+		return
+	var direction: Vector2 = CORNERS[resize_corner] * 2 - Vector2.ONE
+	var diagonal = element.size * resize_start_scale * direction
+	var desired = diagonal + at - resize_pointer_start
+	var wanted = resize_start_scale.x * desired.dot(diagonal) / diagonal.length_squared()
+	if snap_to_grid:
+		wanted = snappedf(element.size.x * wanted, 8) / element.size.x
+	var base = float(element.get_meta("preset_scale", 1.0))
+	var available = Vector2(
+		Generator.CANVAS.x - resize_anchor.x if direction.x > 0 else resize_anchor.x,
+		Generator.CANVAS.y - resize_anchor.y if direction.y > 0 else resize_anchor.y)
+	var maximum = minf(Generator.MAX_ELEMENT_SCALE * base, minf(available.x / element.size.x, available.y / element.size.y))
+	var minimum = minf(Generator.MIN_ELEMENT_SCALE * base, maximum)
+	element.scale = Vector2.ONE * clampf(wanted, minimum, maximum)
+	element.position = resize_anchor - element.size * element.scale * (Vector2.ONE - CORNERS[resize_corner])
+	element_moving.emit(selected_element, element.position)
+	_redraw_selection()
+
+func _cancel_interaction() -> void:
+	var element = _selected()
+	if element != null:
+		if resizing:
+			element.position = resize_start_position
+			element.scale = resize_start_scale
+		elif dragging:
+			element.position = drag_start
+		element_moving.emit(selected_element, element.position)
+	dragging = false
+	resizing = false
+	_redraw_selection()
+
 func _gui_input(event: InputEvent) -> void:
 	if not editable or design_scale <= 0:
 		return
@@ -85,6 +149,19 @@ func _gui_input(event: InputEvent) -> void:
 		if event.pressed:
 			grab_focus()
 			var at = (event.position - origin) / design_scale
+			var handle = _handle_at(event.position)
+			if handle >= 0:
+				var element = _selected()
+				resizing = true
+				dragging = false
+				resize_corner = handle
+				resize_pointer_start = at
+				resize_start_position = element.position
+				resize_start_scale = element.scale
+				resize_anchor = element.position + element.size * element.scale * (Vector2.ONE - CORNERS[handle])
+				mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE if handle % 2 == 0 else Control.CURSOR_BDIAGSIZE
+				accept_event()
+				return
 			var element = _hit_test(at)
 			selected_element = str(element.name) if element != null else ""
 			element_selected.emit(selected_element)
@@ -97,7 +174,9 @@ func _gui_input(event: InputEvent) -> void:
 		_redraw_selection()
 		accept_event()
 	elif event is InputEventMouseMotion:
-		if dragging:
+		if resizing:
+			_resize_to((event.position - origin) / design_scale)
+		elif dragging:
 			var element = _selected()
 			if element != null:
 				var at = (event.position - origin) / design_scale - drag_offset
@@ -107,8 +186,17 @@ func _gui_input(event: InputEvent) -> void:
 				element_moving.emit(selected_element, element.position)
 				_redraw_selection()
 		else:
-			mouse_default_cursor_shape = Control.CURSOR_MOVE if _hit_test((event.position - origin) / design_scale) != null else Control.CURSOR_ARROW
+			var handle = _handle_at(event.position)
+			if handle >= 0:
+				mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE if handle % 2 == 0 else Control.CURSOR_BDIAGSIZE
+			else:
+				mouse_default_cursor_shape = Control.CURSOR_MOVE if _hit_test((event.position - origin) / design_scale) != null else Control.CURSOR_ARROW
 	elif event is InputEventKey and event.pressed and not event.is_command_or_control_pressed():
+		if dragging or resizing:
+			if event.keycode == KEY_ESCAPE:
+				_cancel_interaction()
+				accept_event()
+			return
 		var direction = Vector2.ZERO
 		match event.keycode:
 			KEY_LEFT: direction = Vector2.LEFT
@@ -126,8 +214,14 @@ func _gui_input(event: InputEvent) -> void:
 func _finish_drag() -> void:
 	var element = _selected()
 	var was_dragging = dragging
+	var was_resizing = resizing
 	dragging = false
-	if was_dragging and element != null and not drag_start.is_equal_approx(element.position):
+	resizing = false
+	if was_resizing and element != null:
+		if not resize_start_position.is_equal_approx(element.position) or not resize_start_scale.is_equal_approx(element.scale):
+			var base = float(element.get_meta("preset_scale", 1.0))
+			element_resized.emit(selected_element, resize_start_position, resize_start_scale.x / base, element.position, element.scale.x / base)
+	elif was_dragging and element != null and not drag_start.is_equal_approx(element.position):
 		element_moved.emit(selected_element, drag_start, element.position)
 
 func _notification(what: int) -> void:
@@ -144,8 +238,8 @@ func _draw_selection() -> void:
 		return
 	var rect = Rect2(origin + element.position * design_scale, element.size * element.scale * design_scale).grow(3)
 	selection_overlay.draw_rect(rect, Color("b9ef77"), false, 1.5)
-	for point in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
-		selection_overlay.draw_rect(Rect2(point - Vector2(3, 3), Vector2(6, 6)), Color("b9ef77"))
+	for point in _handle_positions():
+		selection_overlay.draw_rect(Rect2(point - Vector2(4, 4), Vector2(8, 8)), Color("b9ef77"))
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("090f13"))
