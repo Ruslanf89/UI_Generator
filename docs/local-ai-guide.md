@@ -126,8 +126,11 @@ if you need help with its workflow screen. SDXL Base can run without a refiner.
 
 1. Leave ComfyUI running and open UI Forge.
 2. At the top of **Design Brief**, select **Fantasy UI kit**. Choose the kit
-   style, material, and decoration, then click **Generate complete kit**.
-   This creates the editable Menu/HUD/Components layout.
+   art style, design language, material, and decoration, then click
+   **Generate complete kit**.
+   This creates the editable Menu/HUD/Components layout. **Keep seed** can
+   reproduce the initial procedural layout; full generation resets later edits
+   and accepted AI images, so export the result you want to keep first.
 3. Scroll the right-hand inspector to **Local AI Art** and click
    **Open AI studio**. The **Local AI prompt studio** dialog opens.
 4. Leave the server address at **http://127.0.0.1:8188** and click
@@ -184,8 +187,8 @@ that real editable text can be placed above it.
 
 The prompt controls the colors of AI images. The accent picker is disabled
 while AI artwork is active. Describe a different palette and
-generate again to change them. To apply new kit style/material/decoration
-settings, export the current result first, generate the new kit, and then
+generate again to change them. To apply a new kit art style, design language,
+material, or decoration level, export the current result first, generate the new kit, and then
 request its AI artwork.
 
 UI Forge remembers the local address, model choice, and prompt on your PC for

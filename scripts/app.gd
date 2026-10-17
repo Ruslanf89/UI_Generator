@@ -5,6 +5,7 @@ const Exporter = preload("res://scripts/hud_exporter.gd")
 const Preview = preload("res://scripts/hud_preview.gd")
 const Art = preload("res://scripts/hud_art.gd")
 const Kit = preload("res://scripts/kit_generator.gd")
+const KitDesign = preload("res://scripts/kit_design.gd")
 const AIPipeline = preload("res://scripts/ai_pipeline.gd")
 const INK = Color("edf1f3")
 const MUTED = Color("87959f")
@@ -52,9 +53,13 @@ var art_update_timer: Timer
 var creation_picker: OptionButton
 var hud_brief: VBoxContainer
 var kit_brief: VBoxContainer
+var kit_brief_scroll: ScrollContainer
 var kit_style_picker: OptionButton
+var kit_design_picker: OptionButton
 var kit_material_picker: OptionButton
 var kit_ornament_picker: OptionButton
+var kit_seed: SpinBox
+var kit_seed_lock: CheckBox
 var generate_button: Button
 var art_controls: VBoxContainer
 var kit_controls: VBoxContainer
@@ -481,11 +486,16 @@ func _sidebar(parent: Node) -> void:
 			_mark_dirty())
 		component_checks[key] = check
 		components.add_child(check)
+	kit_brief_scroll = ScrollContainer.new()
+	kit_brief_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	kit_brief_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	kit_brief_scroll.hide()
+	outer.add_child(kit_brief_scroll)
 	kit_brief = VBoxContainer.new()
 	kit_brief.add_theme_constant_override("separation", 10)
-	kit_brief.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	kit_brief.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kit_brief.hide()
-	outer.add_child(kit_brief)
+	kit_brief_scroll.add_child(kit_brief)
 	kit_brief.add_child(_label("A whole world of UI.", 21, INK))
 	kit_brief.add_child(_wrapped("Generate a matching menu, gameplay HUD, and library of reusable controls.", 12, MUTED))
 	kit_brief.add_child(_label("01   ART STYLE", 11, MUTED))
@@ -494,24 +504,45 @@ func _sidebar(parent: Node) -> void:
 		kit_style_picker.add_item(style)
 	kit_style_picker.item_selected.connect(func(_index): _mark_dirty())
 	kit_brief.add_child(kit_style_picker)
-	kit_brief.add_child(_label("02   MATERIAL", 11, MUTED))
+	kit_brief.add_child(_label("02   DESIGN LANGUAGE", 11, MUTED))
+	kit_design_picker = OptionButton.new()
+	for design in KitDesign.FAMILIES:
+		kit_design_picker.add_item(design)
+	kit_design_picker.item_selected.connect(func(_index): _mark_dirty())
+	kit_brief.add_child(kit_design_picker)
+	kit_brief.add_child(_label("03   MATERIAL", 11, MUTED))
 	kit_material_picker = OptionButton.new()
 	for material in Kit.MATERIALS:
 		kit_material_picker.add_item(material)
 	kit_material_picker.item_selected.connect(func(_index): _mark_dirty())
 	kit_brief.add_child(kit_material_picker)
-	kit_brief.add_child(_label("03   DECORATION", 11, MUTED))
+	kit_brief.add_child(_label("04   DECORATION", 11, MUTED))
 	kit_ornament_picker = OptionButton.new()
 	for amount in Kit.ORNAMENTS:
 		kit_ornament_picker.add_item(amount)
-	kit_ornament_picker.select(1)
+	kit_ornament_picker.select(2)
 	kit_ornament_picker.item_selected.connect(func(_index): _mark_dirty())
 	kit_brief.add_child(kit_ornament_picker)
-	kit_brief.add_child(_wrapped("Carved frames · button states\nHealth & mana bars · ability slots\nInventory panels · original icons", 12, MUTED))
-	kit_brief.add_child(_wrapped("Every piece is drawn procedurally on your PC. No image service or downloaded artwork.", 11, MUTED))
-	var kit_stretch = Control.new()
-	kit_stretch.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	kit_brief.add_child(kit_stretch)
+	kit_brief.add_child(_label("DESIGN SEED", 11, MUTED))
+	kit_seed = SpinBox.new()
+	kit_seed.min_value = 0
+	kit_seed.max_value = 2147483646
+	kit_seed.step = 1
+	kit_seed.update_on_text_changed = true
+	kit_seed.value = randi_range(0, 2147483646)
+	kit_seed.tooltip_text = "The same brief and seed reproduce the generated shapes, artwork, and composition."
+	kit_seed.value_changed.connect(func(_value):
+		if not updating_controls:
+			kit_seed_lock.button_pressed = true
+			_mark_dirty())
+	kit_brief.add_child(kit_seed)
+	kit_seed_lock = CheckBox.new()
+	kit_seed_lock.text = "Keep seed"
+	kit_seed_lock.add_theme_font_size_override("font_size", 12)
+	kit_seed_lock.toggled.connect(func(_pressed): _mark_dirty())
+	kit_brief.add_child(kit_seed_lock)
+	kit_brief.add_child(_wrapped("Generate explores new shapes and compositions. Keep the seed to repeat a design.", 11, MUTED))
+	kit_brief.add_child(_wrapped("Layered frames · carved ornaments\nHealth & mana bars · inventory · icons\nDrawn offline on your PC.", 11, MUTED))
 	body = outer
 	body.add_child(_label("TARGET RESOLUTION", 11, MUTED))
 	resolution_picker = OptionButton.new()
@@ -523,7 +554,7 @@ func _sidebar(parent: Node) -> void:
 	generate_button.custom_minimum_size.y = 45
 	generate_button.pressed.connect(generate)
 	body.add_child(generate_button)
-	body.add_child(_label("Curated templates · no account or API key", 11, MUTED))
+	body.add_child(_label("Generated locally · no account or API key", 11, MUTED))
 
 func _center(parent: Node) -> void:
 	var center = VBoxContainer.new()
@@ -631,7 +662,7 @@ func _inspector(parent: Node) -> void:
 	regenerate_button.disabled = true
 	regenerate_button.pressed.connect(_regenerate_selected)
 	kit_controls.add_child(regenerate_button)
-	kit_controls.add_child(_wrapped("Select a piece in the preview to give it new details. Other pieces keep their artwork. Ctrl+Z undoes it.", 11, MUTED))
+	kit_controls.add_child(_wrapped("Select a piece to explore a new silhouette, frame, and ornaments. Your arrangement and other pieces stay in place. Ctrl+Z undoes it.", 11, MUTED))
 	kit_controls.add_child(_wrapped("Menu · HUD · Components\nExport saves all three pages and their shared artwork.", 11, MUTED))
 	kit_controls.add_child(HSeparator.new())
 	kit_controls.add_child(_label("LOCAL AI ART", 11, GREEN))
@@ -795,15 +826,26 @@ func _set_creation_mode(index: int) -> void:
 	creation_picker.select(index)
 	hud_brief.visible = index == 0
 	kit_brief.visible = index == 1
+	kit_brief_scroll.visible = index == 1
 	generate_button.text = "Generate complete kit   →" if index == 1 else "Generate 3 variations   →"
 	_mark_dirty()
 
 func _generate_kit() -> void:
 	art_update_timer.stop()
+	kit_seed.apply()
+	var previous_layout: int = int(KitDesign.recipe(current_config).layout) if current_config.get("mode", "hud") == "kit" else -1
 	current_config = Kit.make_config(Kit.STYLES[kit_style_picker.selected])
-	current_config.kit.seed = randi_range(0, 2147483647)
+	current_config.kit.design = KitDesign.FAMILIES[kit_design_picker.selected]
+	var next_seed: int = int(kit_seed.value)
+	if not kit_seed_lock.button_pressed:
+		next_seed = randi_range(0, 2147483646)
+		while next_seed == int(kit_seed.value) or posmod(next_seed, KitDesign.COMPOSITIONS.size()) == previous_layout:
+			next_seed = randi_range(0, 2147483646)
+	kit_seed.set_value_no_signal(next_seed)
+	current_config.kit.seed = next_seed
 	current_config.kit.material = Kit.MATERIALS[kit_material_picker.selected]
 	current_config.kit.ornaments = Kit.ORNAMENTS[kit_ornament_picker.selected]
+	current_config.accent = KitDesign.suggested_accent(current_config)
 	current_config.resolution = [Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(1280, 720)][resolution_picker.selected]
 	layout_history.clear_history()
 	preview.selected_element = ""
@@ -822,9 +864,9 @@ func _generate_kit() -> void:
 	_sync_ai_controls()
 	select_variant(0)
 	_refresh_previews()
-	dirty_label.text = "3 matching kit pages"
+	dirty_label.text = "%s · seed %d" % [KitDesign.recipe(current_config).family, next_seed]
 	dirty_label.modulate = Color.WHITE
-	status_label.text = "%s kit generated offline · Menu, HUD, and reusable components. Export saves the whole kit." % current_config.style
+	status_label.text = "%s · %s · seed %d · Export saves all three kit pages." % [current_config.style, KitDesign.description(current_config), next_seed]
 
 func _regenerate_selected() -> void:
 	if ai_busy or current_config.get("mode", "hud") != "kit":
@@ -842,8 +884,12 @@ func _regenerate_selected() -> void:
 	var had_override = overrides.has(component)
 	var previous = int(overrides.get(component, 0))
 	var next = randi_range(1, 2147483647)
-	while next == previous:
-		next = randi_range(1, 2147483647)
+	var old_silhouette: int = int(KitDesign.recipe(current_config, component).silhouette_index)
+	var candidate: Dictionary = current_config.duplicate(true)
+	candidate.kit.component_seeds[component] = next
+	while next == previous or int(KitDesign.recipe(candidate, component).silhouette_index) == old_silhouette:
+		next = (next % 2147483646) + 1
+		candidate.kit.component_seeds[component] = next
 	layout_history.create_action("Regenerate " + component)
 	layout_history.add_do_method(_apply_component_seed.bind(component, next, true))
 	layout_history.add_undo_method(_apply_component_seed.bind(component, previous, had_override))

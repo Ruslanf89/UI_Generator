@@ -2,10 +2,12 @@ extends RefCounted
 ## Builds a coordinated, script-free kit of native Godot controls.
 
 const Art = preload("res://scripts/kit_art.gd")
+const Design = preload("res://scripts/kit_design.gd")
 const STYLES = ["Illustrated fantasy", "Medieval pixel"]
 const PAGES = ["Menu", "HUD", "Components"]
 const MATERIALS = ["Wood", "Stone", "Parchment"]
 const ORNAMENTS = ["Simple", "Balanced", "Rich"]
+const DESIGNS = Design.FAMILIES
 const CANVAS = Vector2(1280, 720)
 const MIN_ELEMENT_SCALE = 0.35
 const MAX_ELEMENT_SCALE = 3.0
@@ -17,7 +19,7 @@ static func make_config(style: String = STYLES[0]) -> Dictionary:
 		"health": 78.0, "mana": 62.0, "resolution": Vector2i(1920, 1080),
 		"positions": {}, "element_scales": {}, "art": {"enabled": false},
 		"kit": {"seed": randi_range(1, 2147483647), "material": "Wood",
-			"ornaments": "Balanced", "component_seeds": {}}}
+			"ornaments": "Balanced", "design": DESIGNS[0], "component_seeds": {}}}
 
 static func make_theme(config: Dictionary) -> Theme:
 	var result = Theme.new()
@@ -53,6 +55,9 @@ static func build(config: Dictionary, page: int = 0) -> Control:
 	root.set_meta("genre", "Fantasy kit")
 	root.set_meta("style", config.style)
 	root.set_meta("layout", PAGES[page])
+	var recipe = Design.recipe(config)
+	root.set_meta("design_family", recipe.family)
+	root.set_meta("layout_recipe", recipe.layout)
 	match page:
 		0: _menu(root, config)
 		1: _hud(root, config)
@@ -73,44 +78,316 @@ static func build(config: Dictionary, page: int = 0) -> Control:
 	assign_owners(root, root)
 	return root
 
+static func _seeded_layout(config: Dictionary) -> Dictionary:
+	# Only the kit seed drives composition. Artwork overrides never move controls.
+	var recipe = Design.recipe(config)
+	var rng = RandomNumberGenerator.new()
+	rng.seed = int(recipe.seed) * 104729 + 7919
+	return {"layout": int(recipe.layout), "rng": rng}
+
+static func _menu_geometry(config: Dictionary) -> Dictionary:
+	var parameters = _seeded_layout(config)
+	var layout = int(parameters.layout)
+	var rng: RandomNumberGenerator = parameters.rng
+	var banner_rect: Rect2
+	var menu_rect: Rect2
+	var profile_rect: Rect2
+	var buttons: Array[Rect2] = []
+	match layout:
+		0: # Split court: a vertical menu beside a heraldic character card.
+			var spread = float(rng.randi_range(960, 1080))
+			var gutter = float(rng.randi_range(44, 62))
+			var column = roundf((spread - gutter) * rng.randf_range(0.38, 0.43))
+			var top = float(rng.randi_range(180, 204))
+			var left = roundf((CANVAS.x - spread) / 2.0)
+			var height = 674.0 - top
+			var banner_width = float(rng.randi_range(600, 720))
+			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 30, banner_width, rng.randi_range(108, 124))
+			menu_rect = Rect2(left, top, column, height)
+			profile_rect = Rect2(left + column + gutter, top, spread - column - gutter, height)
+			var available = height - 172.0
+			var gap = float(rng.randi_range(12, 18))
+			var button_height = minf(float(rng.randi_range(58, 66)), floorf((available - 3.0 * gap) / 4.0))
+			var inset = float(rng.randi_range(32, 40))
+			var first_y = top + 104 + floorf((available - button_height * 4 - gap * 3) / 2.0)
+			for i in 4:
+				buttons.append(Rect2(left + inset, first_y + i * (button_height + gap), column - inset * 2, button_height))
+		1: # Story sidebar: navigation is a tall left rail; the story leads right.
+			var column = float(rng.randi_range(320, 376))
+			var gutter = float(rng.randi_range(40, 56))
+			var story_x = 44.0 + column + gutter
+			var story_width = 1236.0 - story_x
+			var banner_height = float(rng.randi_range(104, 126))
+			banner_rect = Rect2(story_x + 20, 42, story_width - 40, banner_height)
+			menu_rect = Rect2(44, 42, column, 626)
+			var story_y = banner_rect.end.y + rng.randi_range(40, 52)
+			profile_rect = Rect2(story_x, story_y, story_width, 668.0 - story_y)
+			var gap = float(rng.randi_range(28, 44))
+			var available = menu_rect.size.y - 230.0
+			var button_height = minf(float(rng.randi_range(64, 78)), floorf((available - 3 * gap) / 4.0))
+			var inset = float(rng.randi_range(30, 36))
+			var first_y = 172 + floorf((available - button_height * 4 - gap * 3) / 2.0)
+			for i in 4:
+				buttons.append(Rect2(44 + inset, first_y + i * (button_height + gap), column - inset * 2, button_height))
+		2: # Command grid: wide character summary above a two-column action tray.
+			var margin = float(rng.randi_range(40, 64))
+			var banner_width = float(rng.randi_range(570, 700))
+			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 26, banner_width, rng.randi_range(92, 108))
+			profile_rect = Rect2(margin, rng.randi_range(158, 170), CANVAS.x - margin * 2, rng.randi_range(232, 260))
+			var tray_y = profile_rect.end.y + rng.randi_range(30, 38)
+			var tray_width = float(rng.randi_range(864, 1000))
+			menu_rect = Rect2(roundf((CANVAS.x - tray_width) / 2.0), tray_y, tray_width, 680 - tray_y)
+			var inset = float(rng.randi_range(34, 44))
+			var column_gap = float(rng.randi_range(26, 48))
+			var row_gap = float(rng.randi_range(14, 22))
+			var available = menu_rect.size.y - 86
+			var button_height = minf(float(rng.randi_range(54, 62)), floorf((available - row_gap) / 2.0))
+			var button_width = floorf((tray_width - inset * 2 - column_gap) / 2.0)
+			var first_y = tray_y + 71 + floorf((available - button_height * 2 - row_gap) / 2.0)
+			for i in 4:
+				buttons.append(Rect2(menu_rect.position.x + inset + (i % 2) * (button_width + column_gap), first_y + (i / 2) * (button_height + row_gap), button_width, button_height))
+		_: # Ribbon hall: four equal commands share one broad central ribbon.
+			var banner_width = float(rng.randi_range(620, 760))
+			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 32, banner_width, rng.randi_range(108, 130))
+			var ribbon_width = float(rng.randi_range(1140, 1216))
+			menu_rect = Rect2(roundf((CANVAS.x - ribbon_width) / 2.0), rng.randi_range(196, 216), ribbon_width, rng.randi_range(204, 228))
+			var profile_width = float(rng.randi_range(560, 660))
+			var profile_y = menu_rect.end.y + rng.randi_range(36, 44)
+			profile_rect = Rect2(roundf((CANVAS.x - profile_width) / 2.0), profile_y, profile_width, minf(float(rng.randi_range(198, 222)), 680 - profile_y))
+			var inset = float(rng.randi_range(24, 34))
+			var gap = float(rng.randi_range(14, 28))
+			var button_width = floorf((ribbon_width - inset * 2 - gap * 3) / 4.0)
+			var button_height = minf(float(rng.randi_range(66, 82)), menu_rect.size.y - 128)
+			for i in 4:
+				buttons.append(Rect2(menu_rect.position.x + inset + i * (button_width + gap), menu_rect.position.y + 80, button_width, button_height))
+	return {"layout": layout, "banner": banner_rect, "menu": menu_rect, "profile": profile_rect, "buttons": buttons}
+
 static func _menu(root: Control, config: Dictionary) -> void:
-	_banner(root, config, "TitleBanner", "REALMBOUND", "A TALE OF EMBERS & ANCIENT MAGIC", Rect2(322, 30, 636, 120))
-	var menu = _panel(root, config, "MenuPanel", Rect2(146, 192, 384, 476))
-	_label(menu, "Heading", "Your adventure", Rect2(32, 27, 320, 42), 28, _ink(config), true)
-	_divider(menu, config, Rect2(50, 83, 284, 2))
+	var geometry = _menu_geometry(config)
+	var layout = int(geometry.layout)
+	var banner_rect: Rect2 = geometry.banner
+	var menu_rect: Rect2 = geometry.menu
+	var profile_rect: Rect2 = geometry.profile
+	var buttons: Array[Rect2] = geometry.buttons
+	_banner(root, config, "TitleBanner", "REALMBOUND", "A TALE OF EMBERS & ANCIENT MAGIC", banner_rect)
+	var menu = _panel(root, config, "MenuPanel", menu_rect)
+	var heading = Rect2(30, 27, menu.size.x - 60, 42)
+	var footer = Rect2(28, menu.size.y - 51, menu.size.x - 56, 26)
+	var rule = Rect2(50, 83, menu.size.x - 100, 2)
+	if layout == 1:
+		heading.position.y = 36
+		rule.position.y = 101
+	elif layout == 2:
+		heading = Rect2(30, 13, 330, 34)
+		footer = Rect2(418, 20, menu.size.x - 450, 24)
+		rule = Rect2(34, 55, menu.size.x - 68, 2)
+	elif layout == 3:
+		heading = Rect2(30, 15, menu.size.x - 60, 35)
+		rule = Rect2(52, 60, menu.size.x - 104, 2)
+		footer.position.y = menu.size.y - 38
+	_label(menu, "Heading", "Your adventure", heading, 26 if layout > 1 else 28, _ink(config), true)
+	_divider(menu, config, rule)
 	for i in range(4):
 		var title: String = ["Continue", "New journey", "Settings", "Exit game"][i]
 		var node_name: String = ["ContinueButton", "NewJourneyButton", "SettingsButton", "ExitButton"][i]
-		_button(root, config, node_name, title, Rect2(182, 294 + i * 80, 312, 62))
-	_label(menu, "Footer", "CHAPTER I  /  THE OLD KINGDOM", Rect2(28, 425, 328, 26), 14, _muted(config), true)
-	var profile = _panel(root, config, "CharacterPanel", Rect2(580, 192, 548, 476))
-	_icon(profile, config, "CharacterPanel", "Crest", "icon_shield", Rect2(219, 22, 110, 110))
-	_label(profile, "Name", "Elara, the Wayfarer", Rect2(24, 139, 500, 40), 28, _ink(config), true)
-	_label(profile, "Class", "LEVEL 12  /  SPELLBLADE", Rect2(30, 182, 488, 28), 16, _muted(config), true)
-	_divider(profile, config, Rect2(60, 225, 428, 2))
-	_icon(profile, config, "CharacterPanel", "GoldIcon", "icon_coin", Rect2(85, 246, 36, 36))
-	_label(profile, "Gold", "1,240 gold", Rect2(130, 248, 172, 30), 20)
-	_icon(profile, config, "CharacterPanel", "ManaIcon", "icon_mana", Rect2(324, 246, 36, 36))
-	_label(profile, "Crystals", "85 shards", Rect2(370, 248, 150, 30), 20)
-	var quest = _nested_panel(profile, config, "CharacterPanel", "Quest", Rect2(30, 312, 488, 132), "panel")
-	_icon(quest, config, "CharacterPanel", "Scroll", "icon_scroll", Rect2(21, 33, 58, 58))
-	_label(quest, "Heading", "THE FORGOTTEN SANCTUARY", Rect2(97, 23, 370, 28), 16, _muted(config))
-	var description = _label(quest, "Description", "Follow the lanterns beyond\nthe Whispering Woods.", Rect2(97, 55, 364, 62), 20)
+		_button(root, config, node_name, title, buttons[i])
+	_label(menu, "Footer", "CHAPTER I  /  THE OLD KINGDOM", footer, 13 if layout == 2 else 14, _muted(config), true)
+	var profile = _panel(root, config, "CharacterPanel", profile_rect)
+	_profile_content(profile, config, layout)
+	var baselines = [Vector2(548, 476), Vector2(806, 448), Vector2(1192, 248), Vector2(572, 214)]
+	_resize_contents(profile, profile.size / baselines[layout], config, "CharacterPanel")
+
+static func _profile_content(profile: Panel, config: Dictionary, layout: int) -> void:
+	var crest: Rect2
+	var name_rect: Rect2
+	var class_rect: Rect2
+	var quest_rect: Rect2
+	var gold_at: Vector2
+	var shard_at: Vector2
+	var centered = false
+	match layout:
+		0:
+			crest = Rect2(219, 22, 110, 110)
+			name_rect = Rect2(24, 139, 500, 40)
+			class_rect = Rect2(30, 182, 488, 28)
+			quest_rect = Rect2(30, 312, 488, 132)
+			gold_at = Vector2(85, 246)
+			shard_at = Vector2(324, 246)
+			centered = true
+		1:
+			crest = Rect2(42, 90, 150, 150)
+			name_rect = Rect2(236, 38, 526, 48)
+			class_rect = Rect2(238, 91, 520, 30)
+			quest_rect = Rect2(232, 222, 534, 184)
+			gold_at = Vector2(238, 154)
+			shard_at = Vector2(500, 154)
+		2:
+			crest = Rect2(34, 51, 132, 132)
+			name_rect = Rect2(200, 36, 420, 45)
+			class_rect = Rect2(202, 87, 418, 28)
+			quest_rect = Rect2(656, 32, 500, 184)
+			gold_at = Vector2(202, 150)
+			shard_at = Vector2(432, 150)
+		_:
+			crest = Rect2(26, 52, 108, 108)
+			name_rect = Rect2(156, 25, 390, 40)
+			class_rect = Rect2(158, 68, 388, 28)
+			quest_rect = Rect2(154, 110, 388, 76)
+	_icon(profile, config, "CharacterPanel", "Crest", "icon_shield", crest)
+	_label(profile, "Name", "Elara, the Wayfarer", name_rect, 26 if layout == 3 else 28, _ink(config), centered)
+	_label(profile, "Class", "LEVEL 12  /  SPELLBLADE", class_rect, 16, _muted(config), centered)
+	if layout != 3:
+		_icon(profile, config, "CharacterPanel", "GoldIcon", "icon_coin", Rect2(gold_at, Vector2(36, 36)))
+		_label(profile, "Gold", "1,240 gold", Rect2(gold_at + Vector2(45, 2), Vector2(160, 30)), 20)
+		_icon(profile, config, "CharacterPanel", "ManaIcon", "icon_mana", Rect2(shard_at, Vector2(36, 36)))
+		_label(profile, "Crystals", "85 shards", Rect2(shard_at + Vector2(46, 2), Vector2(132, 30)), 20)
+	if layout == 0:
+		_divider(profile, config, Rect2(60, 225, 428, 2))
+	var quest = _nested_panel(profile, config, "CharacterPanel", "Quest", quest_rect, "panel")
+	var compact = layout == 3
+	_icon(quest, config, "CharacterPanel", "Scroll", "icon_scroll", Rect2(16 if compact else 22, 20 if compact else 39, 34 if compact else 58, 34 if compact else 58))
+	var inset = 65.0 if compact else 100.0
+	_label(quest, "Heading", "THE FORGOTTEN SANCTUARY", Rect2(inset, 12 if compact else 20, quest.size.x - inset - 18, 24 if compact else 28), 14 if compact else 16, _muted(config))
+	var description_y = 37.0 if compact else (57.0 if quest.size.y < 150 else 70.0)
+	var description = _label(quest, "Description", "Beyond the Whispering Woods." if compact else "Follow the lanterns beyond\nthe Whispering Woods.", Rect2(inset, description_y, quest.size.x - inset - 22, quest.size.y - description_y - 14), 14 if compact else 20)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
+static func _resize_contents(parent: Control, factor: Vector2, config: Dictionary, component: String) -> void:
+	# Reflow native child rectangles inside a resized profile. Fonts retain their
+	# readable point sizes; regenerated images match their new logical dimensions.
+	for child in parent.get_children():
+		if not child is Control:
+			continue
+		child.position *= factor
+		child.size *= factor
+		if child is TextureRect and child.texture != null:
+			var role = str(child.texture.get_meta("kit_art_role", ""))
+			if not role.is_empty():
+				child.texture = Art.texture(config, child.size, component, role)
+		elif child is Panel:
+			var style = child.get_theme_stylebox("panel") as StyleBoxTexture
+			if style != null and style.texture != null:
+				var role = str(style.texture.get_meta("kit_art_role", "panel"))
+				child.add_theme_stylebox_override("panel", _texture_style(config, child.size, component, role))
+		_resize_contents(child, factor, config, component)
+
+static func _hud_geometry(config: Dictionary) -> Dictionary:
+	var parameters = _seeded_layout(config)
+	var layout = int(parameters.layout)
+	var rng: RandomNumberGenerator = parameters.rng
+	var banner_rect: Rect2
+	var health_rect: Rect2
+	var mana_rect: Rect2
+	var currency_rect: Rect2
+	var map_rect: Rect2
+	var objective_rect: Rect2
+	var quest_rect: Rect2
+	var abilities: Array[Rect2] = []
+	match layout:
+		0: # Classic corner HUD with a low horizontal hotbar.
+			var banner_width = float(rng.randi_range(400, 500))
+			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 28, banner_width, rng.randi_range(84, 100))
+			var stat_width = float(rng.randi_range(348, 394))
+			var stat_height = float(rng.randi_range(76, 88))
+			var stat_gap = float(rng.randi_range(10, 18))
+			health_rect = Rect2(44, 686 - stat_height * 2 - stat_gap, stat_width, stat_height)
+			mana_rect = Rect2(44, 686 - stat_height, stat_width, stat_height)
+			currency_rect = Rect2(44, 34, rng.randi_range(232, 264), rng.randi_range(64, 74))
+			var map_size = float(rng.randi_range(218, 250))
+			map_rect = Rect2(1236 - map_size, 34, map_size, map_size + 4)
+			var objective_width = float(rng.randi_range(300, 328))
+			objective_rect = Rect2(1236 - objective_width, map_rect.end.y + rng.randi_range(32, 44), objective_width, rng.randi_range(188, 214))
+			quest_rect = Rect2(1052, 630, 184, 54)
+			var slot = float(rng.randi_range(74, 82))
+			var gap = float(rng.randi_range(10, 20))
+			var width = slot * 4 + gap * 3
+			var first_x = maxf(roundf((CANVAS.x - width) / 2.0), health_rect.end.x + 28)
+			for i in 4:
+				abilities.append(Rect2(first_x + i * (slot + gap), 686 - slot, slot, slot))
+		1: # Explorer: health and mana balance the two bottom corners.
+			var banner_width = float(rng.randi_range(460, 490))
+			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 32, banner_width, rng.randi_range(96, 110))
+			var stat_width = float(rng.randi_range(328, 364))
+			var stat_height = float(rng.randi_range(80, 94))
+			health_rect = Rect2(44, 686 - stat_height, stat_width, stat_height)
+			mana_rect = Rect2(1236 - stat_width, 686 - stat_height, stat_width, stat_height)
+			var map_size = float(rng.randi_range(226, 264))
+			map_rect = Rect2(44, 42, map_size, map_size + 2)
+			currency_rect = Rect2(44, map_rect.end.y + 30, map_size, 68)
+			var objective_width = float(rng.randi_range(300, 340))
+			objective_rect = Rect2(1236 - objective_width, 44, objective_width, rng.randi_range(200, 230))
+			quest_rect = Rect2(1052, objective_rect.end.y + 28, 184, 54)
+			var slot = float(rng.randi_range(74, 82))
+			var gap = float(rng.randi_range(12, 20))
+			var first_x = roundf((CANVAS.x - (slot * 4 + gap * 3)) / 2.0)
+			for i in 4:
+				abilities.append(Rect2(first_x + i * (slot + gap), 686 - slot, slot, slot))
+		2: # Tactical: upper-left resources and a vertical right ability rail.
+			var stat_width = float(rng.randi_range(336, 392))
+			var stat_height = float(rng.randi_range(78, 86))
+			health_rect = Rect2(44, 44, stat_width, stat_height)
+			mana_rect = Rect2(44, health_rect.end.y + rng.randi_range(14, 22), stat_width, stat_height)
+			var map_size = float(rng.randi_range(224, 252))
+			map_rect = Rect2(1236 - map_size, 44, map_size, map_size + 8)
+			var banner_x = health_rect.end.x + 44
+			var banner_width = minf(float(rng.randi_range(432, 492)), map_rect.position.x - banner_x - 40)
+			banner_rect = Rect2(banner_x, 34, banner_width, rng.randi_range(88, 104))
+			var currency_width = float(rng.randi_range(236, 264))
+			currency_rect = Rect2(roundf((CANVAS.x - currency_width) / 2.0), 598, currency_width, rng.randi_range(68, 78))
+			objective_rect = Rect2(44, mana_rect.end.y + rng.randi_range(28, 36), rng.randi_range(310, 340), rng.randi_range(190, 212))
+			quest_rect = Rect2(44, 612, 210, 56)
+			var slot = float(rng.randi_range(72, 80))
+			var first_y = map_rect.end.y + 24
+			var gap = minf(float(rng.randi_range(8, 14)), floorf((686 - first_y - slot * 4) / 3.0))
+			for i in 4:
+				abilities.append(Rect2(1236 - slot, first_y + i * (slot + gap), slot, slot))
+		_: # Cinematic: top-row bars, a lower map, and a compact 2 x 2 hotbar.
+			var stat_width = float(rng.randi_range(316, 350))
+			var stat_height = float(rng.randi_range(78, 90))
+			var stat_gap = float(rng.randi_range(24, 40))
+			health_rect = Rect2(1236 - stat_width * 2 - stat_gap, 38, stat_width, stat_height)
+			mana_rect = Rect2(1236 - stat_width, 38, stat_width, stat_height)
+			banner_rect = Rect2(44, 34, health_rect.position.x - 76, rng.randi_range(88, 104))
+			var map_width = float(rng.randi_range(226, 254))
+			var map_height = float(rng.randi_range(234, 262))
+			map_rect = Rect2(44, 686 - map_height, map_width, map_height)
+			currency_rect = Rect2(map_rect.end.x + 24, 618, rng.randi_range(200, 220), 68)
+			var objective_width = float(rng.randi_range(300, 328))
+			var objective_height = float(rng.randi_range(198, 224))
+			objective_rect = Rect2(1236 - objective_width, 686 - objective_height, objective_width, objective_height)
+			quest_rect = Rect2(1052, health_rect.end.y + 28, 184, 54)
+			var slot = float(rng.randi_range(74, 82))
+			var gap = float(rng.randi_range(10, 18))
+			var block_size = slot * 2 + gap
+			var first_x = maxf(roundf((CANVAS.x - block_size) / 2.0), currency_rect.end.x + 26)
+			for i in 4:
+				abilities.append(Rect2(first_x + (i % 2) * (slot + gap), 686 - block_size + (i / 2) * (slot + gap), slot, slot))
+	return {"banner": banner_rect, "health": health_rect, "mana": mana_rect, "currency": currency_rect,
+		"map": map_rect, "objective": objective_rect, "quest": quest_rect, "abilities": abilities}
+
 static func _hud(root: Control, config: Dictionary) -> void:
-	_banner(root, config, "TitleBanner", "ASHEN HOLLOW", "THE NORTHERN REACHES", Rect2(432, 28, 416, 88))
-	_stat(root, config, "Health", "VITALITY", "icon_heart", Rect2(44, 518, 380, 78), float(config.get("health", 78)))
-	_stat(root, config, "Mana", "MANA", "icon_mana", Rect2(44, 608, 380, 78), float(config.get("mana", 62)))
-	var purse = _panel(root, config, "Currency", Rect2(44, 34, 254, 68))
+	var geometry = _hud_geometry(config)
+	var banner_rect: Rect2 = geometry.banner
+	var health_rect: Rect2 = geometry.health
+	var mana_rect: Rect2 = geometry.mana
+	var currency_rect: Rect2 = geometry.currency
+	var map_rect: Rect2 = geometry.map
+	var objective_rect: Rect2 = geometry.objective
+	var quest_rect: Rect2 = geometry.quest
+	var abilities: Array[Rect2] = geometry.abilities
+	_banner(root, config, "TitleBanner", "ASHEN HOLLOW", "THE NORTHERN REACHES", banner_rect)
+	_stat(root, config, "Health", "VITALITY", "icon_heart", health_rect, float(config.get("health", 78)))
+	_stat(root, config, "Mana", "MANA", "icon_mana", mana_rect, float(config.get("mana", 62)))
+	var purse = _panel(root, config, "Currency", currency_rect)
 	_icon(purse, config, "Currency", "Coin", "icon_coin", Rect2(16, 13, 42, 42))
-	_label(purse, "Value", "1,240", Rect2(76, 12, 154, 42), 28)
-	var map = _panel(root, config, "Minimap", Rect2(1010, 34, 226, 230))
-	_label(map, "Title", "WHISPERING WOODS", Rect2(15, 12, 196, 25), 13, _muted(config), true)
+	_label(purse, "Value", "1,240", Rect2(76, 12, purse.size.x - 96, 42), 28)
+	var map = _panel(root, config, "Minimap", map_rect)
+	_label(map, "Title", "WHISPERING WOODS", Rect2(18, 15, map.size.x - 36, 25), 13, _muted(config), true)
 	var content = Control.new()
 	content.name = "MapContent"
-	content.position = Vector2(18, 45)
+	content.position = Vector2(22, 48)
 	content.size = Vector2(190, 153)
+	content.scale = (map.size - Vector2(44, 86)) / content.size
 	content.clip_contents = true
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map.add_child(content)
@@ -125,21 +402,22 @@ static func _hud(root: Control, config: Dictionary) -> void:
 		content.add_child(tree)
 	_icon(content, config, "Minimap", "Player", "icon_arrow", Rect2(84, 75, 27, 27))
 	_icon(content, config, "Minimap", "QuestMarker", "icon_star", Rect2(144, 16, 25, 25))
-	_label(map, "Compass", "N   ·   E   ·   S   ·   W", Rect2(10, 200, 206, 20), 12, _muted(config), true)
-	var objective = _panel(root, config, "Objective", Rect2(926, 296, 310, 194))
+	_label(map, "Compass", "N   ·   E   ·   S   ·   W", Rect2(18, map.size.y - 33, map.size.x - 36, 20), 12, _muted(config), true)
+	var objective = _panel(root, config, "Objective", objective_rect)
 	_icon(objective, config, "Objective", "Scroll", "icon_scroll", Rect2(20, 19, 38, 38))
-	_label(objective, "Title", "A light in the dark", Rect2(67, 22, 220, 33), 21)
-	_divider(objective, config, Rect2(24, 70, 262, 2))
-	var description = _label(objective, "Description", "Find the ancient sanctuary", Rect2(26, 83, 260, 54), 20)
+	_label(objective, "Title", "A light in the dark", Rect2(67, 22, objective.size.x - 90, 33), 18 if _pixel(config) else 20)
+	_divider(objective, config, Rect2(24, 70, objective.size.x - 48, 2))
+	var description = _label(objective, "Description", "Find the ancient sanctuary", Rect2(26, 83, objective.size.x - 52, 62), 20)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_label(objective, "Progress", "Lanterns lit    2 / 3", Rect2(26, 145, 260, 27), 17, _muted(config))
+	_label(objective, "Progress", "Lanterns lit    2 / 3", Rect2(26, objective.size.y - 49, objective.size.x - 52, 27), 17, _muted(config))
 	var icons = ["icon_sword", "icon_shield", "icon_potion", "icon_mana"]
 	for i in range(4):
 		var node_name = "Ability%d" % (i + 1)
-		var button = _button(root, config, node_name, "", Rect2(478 + i * 88, 602, 78, 78), "normal", "slot")
-		_icon(button, config, node_name, "Icon", icons[i], Rect2(17, 10, 44, 44))
-		_label(button, "Key", ["Q", "E", "R", "F"][i], Rect2(8, 53, 62, 20), 13, _ink(config), true)
-	_button(root, config, "QuestLogButton", "Quest log", Rect2(1052, 630, 184, 54))
+		var button = _button(root, config, node_name, "", abilities[i], "normal", "slot")
+		var icon_size = floorf(button.size.x * 0.52)
+		_icon(button, config, node_name, "Icon", icons[i], Rect2((button.size.x - icon_size) / 2.0, 9, icon_size, icon_size))
+		_label(button, "Key", ["Q", "E", "R", "F"][i], Rect2(8, button.size.y - 26, button.size.x - 16, 23), 13, _ink(config), true)
+	_button(root, config, "QuestLogButton", "Quest log", quest_rect)
 
 static func _components(root: Control, config: Dictionary) -> void:
 	_banner(root, config, "TitleBanner", "THE ADVENTURER'S KIT", "ONE SEED  /  A COORDINATED COLLECTION", Rect2(322, 24, 636, 104))
@@ -174,6 +452,35 @@ static func _components(root: Control, config: Dictionary) -> void:
 		var name = "Icon%d" % (i + 1)
 		var icon = _icon(root, config, name, name, icons[i], Rect2(791 + (i % 6) * 74, 550 + (i / 6) * 72, 62, 62))
 		icon.set_meta("kit_component", name)
+	_arrange_library(root, int(Design.recipe(config).layout))
+
+static func _arrange_library(root: Control, layout: int) -> void:
+	# Reorder the demonstration columns as whole pieces; keep each root control
+	# independent so selection, regeneration and exports use the same identities.
+	var panel_x = 44.0
+	var buttons_x = 438.0
+	var inventory_x = 784.0
+	match layout:
+		1:
+			panel_x = 888
+			buttons_x = 544
+			inventory_x = 44
+		2:
+			panel_x = 44
+			buttons_x = 932
+			inventory_x = 430
+		3:
+			panel_x = 888
+			buttons_x = 44
+			inventory_x = 386
+	root.get_node("SamplePanel").position.x = panel_x
+	root.get_node("Inventory").position.x = inventory_x
+	root.get_node("Health").position.x = panel_x
+	root.get_node("Mana").position.x = buttons_x
+	for name in ["PrimaryButton", "HoverButton", "PressedButton", "DisabledButton"]:
+		root.get_node(NodePath(name)).position.x = buttons_x
+	for i in 12:
+		root.get_node(NodePath("Icon%d" % (i + 1))).position.x = inventory_x + 7 + (i % 6) * 74
 
 static func _banner(root: Control, config: Dictionary, id: String, title: String, subtitle: String, rect: Rect2) -> Panel:
 	var panel = _panel(root, config, id, rect, "banner")

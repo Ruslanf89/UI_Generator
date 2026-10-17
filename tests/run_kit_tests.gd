@@ -4,6 +4,7 @@ extends SceneTree
 const Kit = preload("res://scripts/kit_generator.gd")
 const Art = preload("res://scripts/kit_art.gd")
 const Exporter = preload("res://scripts/kit_exporter.gd")
+const Design = preload("res://scripts/kit_design.gd")
 var failures: Array[String] = []
 var checks := 0
 var scratch: String
@@ -25,6 +26,8 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(scratch)
 	_test_generated_kits()
 	_test_artwork()
+	_test_structural_art()
+	_test_seeded_layouts()
 	_test_individual_regeneration()
 	await _test_editor()
 	_test_export()
@@ -118,6 +121,7 @@ func _test_individual_regeneration() -> void:
 	config.element_scales = {"0": {"ContinueButton": 1.15}}
 	var first: Control = Kit.build(config, 0)
 	var before := _texture_snapshot(first)
+	var geometry_before := _layout_signature(first)
 	check(first.get_node("ContinueButton").position == Vector2(140, 280), "Custom kit positions are applied")
 	check(is_equal_approx(first.get_node("ContinueButton").scale.x, 1.15), "Individual kit scaling is applied")
 	config.kit.component_seeds["ContinueButton"] = 96814
@@ -132,6 +136,7 @@ func _test_individual_regeneration() -> void:
 			other_unchanged = other_unchanged and before[path] == after.get(path)
 	check(changed, "Regenerating one component changes its artwork")
 	check(other_unchanged, "Individual regeneration preserves every other component image")
+	check(_layout_signature(second) == geometry_before, "Individual regeneration preserves every component's layout geometry")
 	check(second.get_node("ContinueButton").position == first.get_node("ContinueButton").position and second.get_node("ContinueButton").scale == first.get_node("ContinueButton").scale, "Individual regeneration preserves custom position and size")
 	first.free()
 	second.free()
@@ -174,14 +179,205 @@ func _test_editor() -> void:
 	check(_texture_snapshot(app.preview.hud) == before, "Undo restores the previous component illustration")
 	app.layout_history.redo()
 	check(_texture_snapshot(app.preview.hud) == after, "Redo restores the regenerated component illustration")
+	app.kit_design_picker.select(Design.FAMILIES.find("Wildwood"))
+	app.kit_seed_lock.button_pressed = false
+	app.generate()
+	var first_seed := int(app.current_config.kit.seed)
+	var first_layout := _layout_signature(app.preview.hud)
+	var first_art: PackedByteArray = app.preview.hud.get_node("ContinueButton").get_theme_stylebox("normal").texture.get_image().get_data()
+	app.generate()
+	check(int(app.current_config.kit.seed) != first_seed and _layout_signature(app.preview.hud) != first_layout, "Consecutive unlocked generations change the seed and composition")
+	check(app.preview.hud.get_node("ContinueButton").get_theme_stylebox("normal").texture.get_image().get_data() != first_art, "Consecutive unlocked generations change the illustrated button")
+	check(app.current_config.kit.design == "Wildwood" and app.preview.hud.get_meta("design_family", "") == "Wildwood", "The design picker applies a consistent family")
+	app.kit_seed_lock.button_pressed = false
+	var seed_entry: LineEdit = app.kit_seed.get_line_edit()
+	seed_entry.grab_focus()
+	seed_entry.text = "202703"
+	seed_entry.text_changed.emit(seed_entry.text)
+	await process_frame
+	check(int(app.kit_seed.value) == 202703 and app.kit_seed_lock.button_pressed, "Typing a seed updates its value and enables Keep seed before Generate")
+	app.generate()
+	var locked_layout := _layout_signature(app.preview.hud)
+	var locked_art := _texture_snapshot(app.preview.hud)
+	app.generate()
+	check(int(app.current_config.kit.seed) == 202703 and _layout_signature(app.preview.hud) == locked_layout, "Locked generation reproduces the requested seed and complete layout")
+	check(_texture_snapshot(app.preview.hud) == locked_art, "Locked generation reproduces every rendered asset")
+	app.kit_seed_lock.button_pressed = false
+	seed_entry.text = "202704"
+	seed_entry.text_changed.emit(seed_entry.text)
+	app.generate()
+	check(int(app.current_config.kit.seed) == 202704 and app.kit_seed_lock.button_pressed, "Generate commits a seed typed in the same frame before selecting a design")
 	app.queue_free()
 	await process_frame
+
+func _test_structural_art() -> void:
+	for style in Kit.STYLES:
+		var config: Dictionary = Kit.make_config(style)
+		config.kit.design = "Royal court"
+		var silhouettes := {}
+		var frame_edges := {}
+		for seed in [0, 16, 32, 48, 64, 80]:
+			config.kit.seed = seed
+			var image: Image = Art.texture(config, Vector2(260, 64), "ContinueButton", "button").get_image()
+			silhouettes[_alpha_signature(image)] = true
+			frame_edges[_edge_signature(image)] = true
+		check(silhouettes.size() >= 4, style + " seeds change the actual button silhouette")
+		check(frame_edges.size() >= 4, style + " seeds change the rendered border edge pattern")
+		config.kit.seed = 763
+		var geometry: PackedByteArray
+		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+			var image: Image = Art.texture(config, Vector2(260, 64), "ContinueButton", "button", state).get_image()
+			var cached: Image = Art.texture(config, Vector2(260, 64), "ContinueButton", "button", state).get_image()
+			_clear_art_cache()
+			var regenerated: Image = Art.texture(config, Vector2(260, 64), "ContinueButton", "button", state).get_image()
+			check(image.get_data() == cached.get_data() and image.get_data() == regenerated.get_data(), style + " " + state + " reproduces the cached and uncached artwork")
+			if state == "normal":
+				geometry = _alpha_signature(image)
+			elif state != "focus":
+				check(_alpha_signature(image) == geometry, style + " " + state + " retains its normal button contour")
+		var family_edges := {}
+		for family in Design.FAMILIES.slice(1):
+			config.kit.design = family
+			var texture: ImageTexture = Art.texture(config, Vector2(280, 180), "SamplePanel", "panel")
+			family_edges[_edge_signature(texture.get_image())] = true
+			check(texture.get_meta("kit_art_family", "") == family, style + " renders the chosen " + family + " design language")
+		check(family_edges.size() >= 3, style + " families change rendered border and ornament edge patterns")
+		for role in ["icon_sword", "icon_gear", "icon_bag"]:
+			var icon_shapes := {}
+			for seed in [0, 16, 32, 48, 64, 80]:
+				config.kit.seed = seed
+				var image: Image = Art.texture(config, Vector2(64, 64), "Inventory", role).get_image()
+				icon_shapes[_alpha_signature(image)] = true
+			check(icon_shapes.size() >= 3, style + " " + role + " has multiple structural icon silhouettes")
+
+func _test_seeded_layouts() -> void:
+	for style in Kit.STYLES:
+		var config: Dictionary = Kit.make_config(style)
+		config.kit.design = "Surprise me"
+		var recipes := {}
+		for seed in range(64):
+			config.kit.seed = seed
+			var design: Dictionary = Design.recipe(config)
+			if not recipes.has(design.layout):
+				recipes[design.layout] = config.duplicate(true)
+			if recipes.size() == 4:
+				break
+		check(recipes.size() == 4, style + " seeds expose four composition recipes")
+		var rendered_layouts := [{}, {}, {}]
+		for layout in recipes:
+			var candidate: Dictionary = recipes[layout]
+			var expected: Dictionary = Design.recipe(candidate)
+			for page in range(Kit.PAGES.size()):
+				var generated: Control = Kit.build(candidate, page)
+				rendered_layouts[page][_layout_signature(generated)] = true
+				check(generated.get_meta("layout_recipe", -1) == layout and generated.get_meta("design_family", "") == expected.family, style + " " + Kit.PAGES[page] + " records its actual design recipe")
+				_check_composition(generated, style + " " + Kit.PAGES[page] + " recipe " + str(layout))
+				var textures: Array[Texture2D] = []
+				_collect_art_resources(generated, textures)
+				var consistent := not textures.is_empty()
+				for texture in textures:
+					consistent = consistent and texture.get_meta("kit_art_family", "") == expected.family
+				check(consistent, style + " " + Kit.PAGES[page] + " keeps all frames, states, fills, and icons in one family")
+				generated.free()
+		for page in [0, 1]:
+			check(rendered_layouts[page].size() >= 4, style + " " + Kit.PAGES[page] + " has four different rendered position and size arrangements")
+		var same_recipe_layouts := [{}, {}]
+		for seed in [0, 64, 128, 192]:
+			config.kit.seed = seed
+			for page in [0, 1]:
+				var generated: Control = Kit.build(config, page)
+				same_recipe_layouts[page][_layout_signature(generated)] = true
+				_check_composition(generated, style + " " + Kit.PAGES[page] + " same-recipe seed " + str(seed))
+				generated.free()
+		for page in [0, 1]:
+			check(same_recipe_layouts[page].size() >= 3, style + " " + Kit.PAGES[page] + " seeds vary proportions and spacing within one composition recipe")
+
+func _check_composition(generated: Control, description: String) -> void:
+	var bounded := true
+	var overlaps: Array[String] = []
+	var children := generated.get_children()
+	for index in range(children.size()):
+		var node: Control = children[index]
+		var rect := Rect2(node.position, node.size * node.scale)
+		bounded = bounded and Rect2(Vector2.ZERO, Vector2(1280, 720)).encloses(rect)
+		for other_index in range(index):
+			var other: Control = children[other_index]
+			var other_rect := Rect2(other.position, other.size * other.scale)
+			if not rect.intersects(other_rect):
+				continue
+			var panel: Control = node if node.name == "MenuPanel" else other if other.name == "MenuPanel" else null
+			var button: Control = other if panel == node else node
+			var menu_inset := panel != null and button.name in ["ContinueButton", "NewJourneyButton", "SettingsButton", "ExitButton"] and Rect2(panel.position, panel.size * panel.scale).encloses(Rect2(button.position, button.size * button.scale))
+			if not menu_inset:
+				overlaps.append(str(node.name) + "/" + str(other.name))
+	check(bounded, description + " keeps every component within the canvas")
+	check(overlaps.is_empty(), description + " has no unintended component overlaps: " + ", ".join(overlaps))
+
+func _layout_signature(generated: Control) -> String:
+	var parts: Array[String] = []
+	for node in generated.get_children():
+		parts.append("%s:%.3f,%.3f,%.3f,%.3f,%.3f,%.3f" % [node.name, node.position.x, node.position.y, node.size.x, node.size.y, node.scale.x, node.scale.y])
+	parts.sort()
+	return "|".join(parts)
+
+func _alpha_signature(image: Image) -> PackedByteArray:
+	var signature := PackedByteArray()
+	var bytes := image.get_data()
+	signature.resize(image.get_width() * image.get_height())
+	for index in range(signature.size()):
+		signature[index] = 1 if bytes[index * 4 + 3] >= 128 else 0
+	return signature
+
+func _edge_signature(image: Image) -> PackedByteArray:
+	var signature := PackedByteArray()
+	var bytes := image.get_data()
+	var width := image.get_width()
+	var height := image.get_height()
+	# This supplements the geometric alpha-mask test with a border appearance
+	# check. Exclude the quiet center so surface grain cannot dominate it.
+	var band := maxi(8, roundi(mini(width, height) * .2))
+	signature.resize(width * height)
+	for y in range(height - 1):
+		for x in range(width - 1):
+			if x >= band and x < width - band and y >= band and y < height - band:
+				continue
+			var index := (y * width + x) * 4
+			if bytes[index + 3] < 128:
+				continue
+			var across := 0
+			var below := 0
+			for channel in range(3):
+				across += absi(int(bytes[index + channel]) - int(bytes[index + 4 + channel]))
+				below += absi(int(bytes[index + channel]) - int(bytes[index + width * 4 + channel]))
+			signature[y * width + x] = 1 if across >= 96 or below >= 96 else 0
+	return signature
+
+func _collect_art_resources(node: Node, textures: Array[Texture2D]) -> void:
+	if node is TextureRect and node.texture != null:
+		textures.append(node.texture)
+	if node is Control:
+		var styles: Array[String] = []
+		if node is Button:
+			styles = ["normal", "hover", "pressed", "disabled", "focus"]
+		elif node is ProgressBar:
+			styles = ["background", "fill"]
+		elif node is Panel:
+			styles = ["panel"]
+		for state in styles:
+			var style: StyleBox = node.get_theme_stylebox(state)
+			if style is StyleBoxTexture and style.texture != null:
+				textures.append(style.texture)
+	for child in node.get_children():
+		_collect_art_resources(child, textures)
 
 func _test_export() -> void:
 	var config: Dictionary = Kit.make_config(Kit.STYLES[1])
 	config.kit.seed = 5693
 	config.kit.material = Kit.MATERIALS[2]
-	config.positions = {"0": {"ContinueButton": Vector2(140, 280)}, "1": {"Health": Vector2(60, 580)}}
+	config.kit.design = "Runic forge"
+	# Keep this deliberately moved command clear of the preset command row so
+	# the native input check targets the same component whose transform we verify.
+	config.positions = {"0": {"ContinueButton": Vector2(140, 130)}, "1": {"Health": Vector2(60, 580)}}
 	config.element_scales = {"0": {"ContinueButton": 1.15}, "1": {"Health": 1.25}}
 	config.health = 43
 	config.mana = 28
@@ -199,7 +395,8 @@ func _test_export() -> void:
 	check(assets.size() > 30, "The kit includes surface, icon, bar, and button-state artwork")
 	var manifest = JSON.parse_string(FileAccess.get_file_as_string(exported.path.path_join("preset.json")))
 	check(manifest.kit.seed == 5693 and manifest.kit.material == Kit.MATERIALS[2], "The preset preserves reproducible kit settings")
-	check(manifest.positions["0"].ContinueButton.x == 140 and is_equal_approx(manifest.element_scales["1"].Health, 1.25), "The preset preserves positions and individual scales")
+	check(manifest.kit.design == "Runic forge", "The preset records the selected procedural design family")
+	check(manifest.positions["0"].ContinueButton.x == 140 and manifest.positions["0"].ContinueButton.y == 130 and is_equal_approx(manifest.element_scales["1"].Health, 1.25), "The preset preserves positions and individual scales")
 	var duplicate: Dictionary = Exporter.export_kit(config, 1, scratch)
 	check(duplicate.ok and duplicate.path != exported.path, "Repeated kit exports preserve previous exports")
 	var invalid: Dictionary = Exporter.export_kit(config, 0, scratch.path_join("missing"))
@@ -235,7 +432,7 @@ func verify():
             return
         if filename == "menu":
             var button = elements.get_node("ContinueButton")
-            if not button is Button or button.position != Vector2(140, 280) or not is_equal_approx(button.scale.x, 1.15):
+            if not button is Button or button.position != Vector2(140, 130) or not is_equal_approx(button.scale.x, 1.15):
                 quit(3)
                 return
             for state in ["normal", "hover", "pressed", "disabled", "focus"]:

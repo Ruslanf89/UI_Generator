@@ -73,6 +73,24 @@ PNGs). Preserve component identifiers when sharing artwork across pages: a
 component seed override should change that component everywhere it appears,
 while leaving other artwork and all transforms intact.
 
+`scripts/kit_design.gd` supplies the shared seeded recipe for the design language,
+frame geometry and motifs, icon/fill variants, and menu/HUD composition. Preserve
+determinism when extending the generator: the same seed and brief should
+rebuild the same procedural design, independent of cache state. Keep component
+regeneration isolated from the shared recipe and page transforms so refining
+one piece does not reroll the rest of the kit.
+
+`scripts/kit_art.gd` delegates detailed frame geometry and ornaments to
+`scripts/kit_frame_art.gd`, and icon drawing to `scripts/kit_icon_art.gd`.
+Keep these helpers coordinated through the shared recipe when adding variants.
+
+When changing recipe or composition code, check both art styles, all four
+design languages, and all four menu/HUD compositions. Compare a rebuilt seed
+after clearing artwork caches, and verify that an individual reroll leaves
+other images and page transforms unchanged. The **Keep seed** workflow should
+reproduce the initial generated design; full generation still clears custom
+arrangements and component overrides.
+
 The default kit remains entirely procedural. Optional prompt generation uses
 `scripts/comfy_client.gd` for the local ComfyUI API,
 `scripts/ai_pipeline.gd` for coordinated requests, and `scripts/ai_art.gd` for

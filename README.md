@@ -37,13 +37,19 @@ project rather than a ready-to-run Windows executable.
 ## Create a fantasy UI kit
 
 1. At the top of **Design Brief**, choose **Fantasy UI kit**.
-2. Choose **Illustrated fantasy** or **Medieval pixel**, then **Wood**, **Stone**,
-   or **Parchment** and a decoration level: **Simple**, **Balanced**, or **Rich**.
-3. Choose a target resolution and click **Generate complete kit**.
+2. Choose **Illustrated fantasy** or **Medieval pixel** and a **Design language**:
+   **Royal court**, **Wildwood**, **Runic forge**, **Astral order**, or **Surprise me**.
+   Choose **Wood**, **Stone**, or **Parchment** and a decoration level:
+   **Simple**, **Balanced**, or **Rich**.
+3. Choose a target resolution and click **Generate complete kit**. Leave
+   **Keep seed** unchecked to get a new seed and a different composition each
+   time. Enter a **Design seed** to turn **Keep seed** on and reproduce that starting
+   design with the same brief.
 4. Use the **Menu**, **HUD**, and **Components** cards to explore your matching kit.
    Change the accent color, drag pieces, or resize them with their corner handles.
 5. Select a piece in the large preview and click **Regenerate selected** on the
-   right to vary its artwork. Other pieces and all positions/sizes stay intact.
+   right to vary its shapes and ornaments. Other pieces and all positions/sizes
+   stay intact.
    A piece shared across pages, such as Health, changes across those pages.
    **Ctrl+Z** undoes the regeneration.
 6. Click **Export to Godot** and choose an existing destination folder.
@@ -56,7 +62,17 @@ editable controls; connect menu actions and sample values to your game code.
 
 ![Illustrated fantasy and medieval pixel kits](docs/fantasy-kits.png)
 
-The built-in kit artwork is procedural and needs no separate model. For
+The offline generator builds a shared design recipe for the kit: frame
+silhouettes, corners, motifs, icons, and bar fills vary together. Complete
+generation also chooses between four menu/HUD compositions with seeded panel
+proportions, spacing, and placement. This creates coordinated alternatives while keeping
+all three pages part of one matching kit.
+Keeping a seed reproduces the initial kit; export to preserve your mouse edits,
+individual regenerations, or accepted AI artwork.
+
+![Offline design languages in both art styles](docs/procedural-designs.png)
+
+Built-in artwork runs locally and needs no separate model or ComfyUI. For
 **prompt-generated images**, open **Local AI Art → Open AI studio** on the right
 and connect to ComfyUI running on your PC. Choose an installed SDXL checkpoint,
 describe the art, and click **Generate AI artwork**. This uses a real local image
@@ -100,6 +116,8 @@ The exported scene keeps your custom element positions and individual scales.
 
 - A complete fantasy kit in two separate art styles, with matching Menu, HUD,
   and Components pages and regeneration of individual pieces.
+- Four design languages, **Surprise me**, seeded frame/icon/fill variations,
+  and four menu/HUD compositions with different grouping and placement.
 - Three kit materials and three decoration levels, with procedural icons,
   button states, framed panels, health/mana bars, and inventory/ability samples.
 - Optional local ComfyUI/SDXL prompt-to-art generation for fantasy kits, with
@@ -129,7 +147,8 @@ Designs are held in memory. **Export before closing the app, generating a new
 design, or clicking New UI.**
 Changing the brief requires Generate to apply; Generate resets the current
 color, size, sample values, component positions/scales, and generated artwork.
-Kit generation creates a fresh coordinated seed; use **Regenerate selected**
+Kit generation creates a fresh coordinated seed unless **Keep seed** is on;
+full generation resets custom edits in either case. Use **Regenerate selected**
 to refine one piece of an existing kit.
 Existing exports are kept in separate folders. Loading exported presets back
 into the designer is not implemented.

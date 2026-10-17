@@ -72,7 +72,7 @@ extracted folder. Keep the whole app folder together when moving it.
 | Area | What it controls |
 | --- | --- |
 | Mode dropdown at the top of **Design Brief** | Choose **HUD layouts** or **Fantasy UI kit** |
-| **Design Brief**, on the left | HUD game type/style/components, or kit art style/material/decoration; target resolution and Generate |
+| **Design Brief**, on the left | HUD game type/style/components, or kit art style/design language/material/decoration/seed; target resolution and Generate |
 | Large central preview | The selected layout or kit page over an illustrative background; select, move, and resize pieces here |
 | Three thumbnails below the preview | HUD layout options, or the kit's Menu, HUD, and Components pages |
 | **The Finishing Touches**, on the right | Accent color, HUD size, and example health/mana values |
@@ -205,11 +205,16 @@ matching shapes, materials, colors, and ornaments.
    **Fantasy UI kit**.
 3. Under **Art Style**, choose **Illustrated fantasy** for smooth carved frames
    and layered ornaments, or **Medieval pixel** for blocky pixel artwork.
-4. Under **Material**, choose **Wood**, **Stone**, or **Parchment**.
-5. Under **Decoration**, choose **Simple**, **Balanced**, or **Rich**. This
+4. Under **Design language**, choose **Royal court**, **Wildwood**, **Runic
+   forge**, or **Astral order**. Choose **Surprise me** to let generation choose
+   a language for you. The language coordinates the shapes and decorative motifs
+   used throughout the kit.
+5. Under **Material**, choose **Wood**, **Stone**, or **Parchment**.
+6. Under **Decoration**, choose **Simple**, **Balanced**, or **Rich**. This
    controls the amount of trim and ornamentation.
-6. Choose **Target Resolution**, then click **Generate complete kit**.
-7. Click **Menu**, **HUD**, and **Components** below the previews to inspect
+7. Leave **Keep seed** unchecked to explore new results. Choose **Target
+   Resolution**, then click **Generate complete kit**.
+8. Click **Menu**, **HUD**, and **Components** below the previews to inspect
    the three pages. These are parts of one kit, rather than alternative layouts.
 
 ![The two fantasy kit art styles](fantasy-kits.png)
@@ -225,6 +230,45 @@ work offline without a separate model. You can also generate images from a
 prompt using local ComfyUI and SDXL, as described below. The controls and sample
 screens form a starting kit; the app does not create gameplay logic.
 
+### Explore different offline designs
+
+The generator uses one seeded design recipe to coordinate frame silhouettes,
+corner shapes, ornaments, icons, and health/mana fills. The chosen design
+language guides this recipe across buttons, panels, and HUD pieces. Generation
+also selects among four menu/HUD compositions, changing grouping and placement
+as well as the artwork: **Split court**, **Story sidebar**, **Command grid**,
+and **Ribbon hall**. Any design language can use any of these compositions.
+The seed also varies panel proportions, button spacing, and HUD dimensions
+within a composition, so each layout type can produce many different designs.
+
+![The four offline design languages in both art styles](procedural-designs.png)
+
+With **Keep seed** unchecked, click **Generate complete kit** to get a fresh
+seed and a different composition from the previous kit. The **Menu**,
+**HUD**, and **Components** cards show pages of that result; they are not three
+alternative complete kits. Use **Regenerate selected** when you want new
+artwork for one piece while keeping the current layout and other artwork.
+
+To reproduce a starting design:
+
+1. Note the **Design seed** shown after generating a kit and keep the same art style,
+   design language, material, decoration, and resolution choices.
+2. Enter that number under **Design seed**. Editing it automatically checks **Keep seed**.
+   You can also tick **Keep seed** to reuse the seed already displayed.
+3. Click **Generate complete kit**. The same seed and brief recreate the same
+   initial procedural artwork and layout. **Surprise me** is repeatable too.
+4. Uncheck **Keep seed** when you want to explore fresh complete designs again.
+
+Keeping a seed does not keep your custom mouse arrangement or later individual
+regenerations when you generate the whole kit again. Full generation starts
+from the generated layout and clears those edits, as well as accepted AI art.
+Export the current result to preserve it. **Regenerate selected** can still
+vary one piece while the main kit seed is kept.
+
+The built-in generator needs no ComfyUI installation, model download, provider
+account, or text prompt. Its controls describe a procedural design; the
+separate AI studio is optional.
+
 ### Refine one piece without replacing the kit
 
 1. Open the page containing the piece you want to change.
@@ -236,9 +280,10 @@ screens form a starting kit; the app does not create gameplay logic.
 4. Inspect the new details. Click again for another result, or press **Ctrl+Z**
    to restore the previous artwork. **Ctrl+Shift+Z** or **Ctrl+Y** redoes it.
 
-Regeneration changes that component's artwork, including its related states
-and icons. Other components keep their artwork, and all pages keep their
-positions and sizes. A component used on multiple pages, such as **Health**
+Offline regeneration changes that component's shapes, frame structure, and
+ornaments, including its related states and icons. Other components keep their
+artwork, and all pages keep their positions and sizes. A component used on
+multiple pages, such as **Health**
 or **TitleBanner**, receives the change on each of those pages.
 
 Drag pieces and use their corner handles as described above. **Accent Color**,
@@ -247,8 +292,8 @@ Drag pieces and use their corner handles as described above. **Accent Color**,
 choices on the left supply the built-in kit artwork. The accent picker is
 disabled while AI images are active; their colors come from the artwork prompt.
 
-Changing the kit style, material, decoration, or resolution marks the brief as
-pending. **Generate complete kit** applies it by creating a fresh entire kit
+Changing the kit style, design language, material, decoration, or resolution
+marks the brief as pending. **Generate complete kit** applies it by creating a fresh entire kit
 and resetting the current arrangement, color, sizes, and sample values. Export
 first if you want to keep the previous result. **Regenerate selected** is the
 way to change one piece while preserving the current kit.
@@ -359,8 +404,8 @@ Keep the **whole folder** together. `menu.tscn` is the menu example,
 `hud.tscn` is the gameplay overlay, and `components.tscn` is a collection of
 matching reusable controls. They share `kit_theme.tres` and use images in
 `art/`. Some button images appear only on hover, focus, or press, so keep all
-of them. `preset.json` records the design settings, positions, sizes, and seed
-information. AI exports also include their accepted generated PNGs; those
+of them. `preset.json` records the design language, settings, positions, sizes,
+and seed information. AI exports also include their accepted generated PNGs; those
 images are the artwork your game uses. The preset cannot yet be reopened in
 UI Forge.
 
@@ -375,7 +420,8 @@ You can keep editing the exported scene and theme directly in Godot.
 
 The menus, minimap, weapon values, timers, inventory, and ability slots contain
 example data. They become functional when connected to your game's code. The central preview
-background is illustrative and is not exported. Generation uses local templates.
+background is illustrative and is not exported. HUD layouts use local templates;
+fantasy kits combine seeded artwork and composition rules.
 
 ## Troubleshooting
 
@@ -393,6 +439,8 @@ background is illustrative and is not exported. Generation uses local templates.
 | Art generation says it needs a panel | Include Health, Minimap, Weapon, or another panel component. The crosshair is made of native shapes. |
 | Regenerate selected is disabled | Generate a fantasy kit, then select a piece in the large preview. |
 | Kit material/style changes are not visible | Click **Generate complete kit** to apply the pending brief. Export the current kit first if you want to keep it. |
+| Generate keeps recreating the same offline kit | Uncheck **Keep seed** to get a fresh seed and another composition. |
+| The same seed does not restore my dragged positions | Seeds reproduce the initial procedural kit. Export before full generation to preserve mouse edits and individual regenerations. |
 | A kit exports pages you were not viewing | This is expected: every kit export includes Menu, HUD, and Components. |
 | Menu buttons do not start a game | Export the kit, add the menu to your game, and connect its Button signals to your game code. |
 | Local AI cannot connect, or generation fails | Follow the [local AI troubleshooting guide](local-ai-guide.md#troubleshooting-an-rtx-5060-8-gb-setup); test a single SDXL image in ComfyUI first. |

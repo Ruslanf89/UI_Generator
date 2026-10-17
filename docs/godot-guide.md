@@ -156,10 +156,21 @@ the test scene; F5 may ask you to select it as the main scene.
 ### 1. Generate and export the kit
 
 In UI Forge, select **Fantasy UI kit** at the top of **Design Brief**. Choose
-**Illustrated fantasy** or **Medieval pixel**, a material and decoration level,
-then click **Generate complete kit**. Arrange components on the **Menu**,
+**Illustrated fantasy** or **Medieval pixel**, a **Design language** (Royal court,
+Wildwood, Runic forge, Astral order, or Surprise me), a material, and decoration
+level, then click **Generate complete kit**. Arrange components on the **Menu**,
 **HUD**, and **Components** pages. Select a piece and use **Regenerate selected**
 to change only its artwork; **Ctrl+Z** restores the previous version.
+
+The offline generator coordinates silhouettes, corners, motifs, icons, and bar
+fills through a shared design recipe. It also selects among four menu/HUD
+compositions. Native component names and the export structure stay consistent,
+so the integration paths below apply across these designs. Generating another
+complete kit replaces your current arrangement; export work you want to keep.
+Leave **Keep seed** unchecked for fresh results. Entering a **Design seed** checks
+**Keep seed** automatically; the same seed and brief reproduce the initial
+procedural artwork and layout. Custom mouse edits and individual regenerations
+are preserved through export, rather than by the base seed.
 
 For prompt-generated images, follow the
 [local AI setup guide](local-ai-guide.md), then use **Local AI Art → Open AI
@@ -276,8 +287,8 @@ can make pixels uneven; use whole-number viewport scaling when a strict pixel
 grid is important for your game. The selected target resolution is recorded in
 the export; it does not change your game's Project Settings.
 
-`preset.json` records the design settings, seed information, positions, and
-scales. The exported PNGs preserve accepted AI artwork. Importing the preset back
+`preset.json` records the design language, settings, seed information, positions,
+and scales. The exported PNGs preserve accepted AI artwork. Importing the preset back
 into UI Forge is not implemented. Export before generating a new kit or closing
 the designer. Subsequent exports create separate folders and do not merge
 your Godot scene edits.
@@ -439,7 +450,10 @@ in Godot's 2D editor before running it.
 | Designer window, controls, and actions | `scripts/app.gd` |
 | Preview rendering, mouse selection, dragging, and resizing | `scripts/hud_preview.gd` |
 | Fantasy kit scenes and native control layout | `scripts/kit_generator.gd` |
+| Shared offline design languages and seeded recipe | `scripts/kit_design.gd` |
 | Fantasy kit procedural shapes, surfaces, ornaments, and icons | `scripts/kit_art.gd` |
+| Detailed procedural frame silhouettes and ornaments | `scripts/kit_frame_art.gd` |
+| Procedural icon shapes and variations | `scripts/kit_icon_art.gd` |
 | Local ComfyUI connection, model discovery, and image requests | `scripts/comfy_client.gd` |
 | Local AI batch generation and progress | `scripts/ai_pipeline.gd` |
 | AI artwork preparation and integration | `scripts/ai_art.gd` |
