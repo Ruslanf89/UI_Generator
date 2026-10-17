@@ -1,7 +1,9 @@
 extends RefCounted
-## Original, seeded artwork built from geometry. No images, network, or services.
+## Seeded geometry, with optional reviewed local PNG artwork from the AI workflow.
 ## Both styles export at 2x the requested logical size. Pixel artwork is snapped
 ## to a small palette and enlarged with nearest-neighbor interpolation.
+
+const AIArt = preload("res://scripts/ai_art.gd")
 
 const STYLES = ["Illustrated fantasy", "Medieval pixel"]
 const MATERIALS = ["Wood", "Stone", "Parchment"]
@@ -11,6 +13,9 @@ static var pixel_color_cache: Dictionary = {}
 static var pixel_cache_accent: String = ""
 
 static func texture(config: Dictionary, dimensions: Vector2, component: String, kind: String = "panel", state: String = "normal") -> ImageTexture:
+	var accepted_art: ImageTexture = AIArt.texture(config, dimensions, component, kind, state)
+	if accepted_art != null:
+		return accepted_art
 	var kit: Dictionary = config.get("kit", {})
 	var material: String = str(kit.get("material", "Wood"))
 	if material not in MATERIALS:
@@ -22,7 +27,7 @@ static func texture(config: Dictionary, dimensions: Vector2, component: String, 
 	var seed_value: int = int(kit.get("seed", 1)) + int(component.hash()) + int(overrides.get(component, 0)) * 7919
 	var width: int = maxi(1, roundi(dimensions.x))
 	var height: int = maxi(1, roundi(dimensions.y))
-	var key: String = JSON.stringify([style, accent, material, decorations, seed_value, kind, state, width, height])
+	var key: String = JSON.stringify([style, accent, material, decorations, seed_value, component, kind, state, width, height])
 	if texture_cache.has(key):
 		return texture_cache[key]
 	if texture_cache.size() >= 384:
@@ -37,6 +42,9 @@ static func texture(config: Dictionary, dimensions: Vector2, component: String, 
 	if pixel:
 		_pixelize(image, width, height, material, accent, kind)
 	var result := ImageTexture.create_from_image(image)
+	result.set_meta("kit_art_role", kind)
+	result.set_meta("kit_art_component", component)
+	result.set_meta("kit_art_source", "procedural")
 	texture_cache[key] = result
 	return result
 

@@ -5,6 +5,7 @@ const Exporter = preload("res://scripts/hud_exporter.gd")
 const Preview = preload("res://scripts/hud_preview.gd")
 const Art = preload("res://scripts/hud_art.gd")
 const Kit = preload("res://scripts/kit_generator.gd")
+const AIPipeline = preload("res://scripts/ai_pipeline.gd")
 const INK = Color("edf1f3")
 const MUTED = Color("87959f")
 const GREEN = Color("b9ef77")
@@ -58,6 +59,23 @@ var generate_button: Button
 var art_controls: VBoxContainer
 var kit_controls: VBoxContainer
 var regenerate_button: Button
+var new_ui_button: Button
+var ai_pipeline: Node
+var ai_dialog: AcceptDialog
+var ai_endpoint: LineEdit
+var ai_model_picker: OptionButton
+var ai_quality_picker: OptionButton
+var ai_prompt: TextEdit
+var ai_status: Label
+var ai_progress: ProgressBar
+var ai_connect_button: Button
+var ai_generate_button: Button
+var ai_selected_button: Button
+var ai_cancel_button: Button
+var ai_restore_button: Button
+var ai_hint: Label
+var ai_busy = false
+var ai_preferred_checkpoint = ""
 
 func _ready() -> void:
 	DisplayServer.window_set_min_size(Vector2i(1120, 900))
@@ -67,6 +85,8 @@ func _ready() -> void:
 	generate()
 
 func _exit_tree() -> void:
+	if is_instance_valid(ai_pipeline):
+		ai_pipeline.cancel()
 	layout_history.free()
 
 func _build_theme() -> void:
@@ -89,6 +109,18 @@ func _build_theme() -> void:
 			style.content_margin_bottom = 8
 			app_theme.set_stylebox(state, type, style)
 	app_theme.set_stylebox("panel", "PopupMenu", Generator.panel_style(SURFACE, BORDER, 6))
+	var dialog_panel = Generator.panel_style(SURFACE, BORDER, 10)
+	for side in ["left", "right", "top", "bottom"]:
+		dialog_panel.set("content_margin_" + side, 14)
+	app_theme.set_stylebox("panel", "AcceptDialog", dialog_panel)
+	var dialog_border = get_theme_stylebox("embedded_border", "Window").duplicate()
+	if dialog_border is StyleBoxFlat:
+		dialog_border.bg_color = SURFACE
+		dialog_border.border_color = BORDER
+		app_theme.set_stylebox("embedded_border", "Window", dialog_border)
+	for type in ["LineEdit", "TextEdit"]:
+		app_theme.set_stylebox("normal", type, Generator.panel_style(Color("0b141d"), BORDER, 5))
+		app_theme.set_stylebox("read_only", type, Generator.panel_style(SURFACE, BORDER, 5))
 	app_theme.set_color("font_color", "PopupMenu", INK)
 	app_theme.set_stylebox("panel", "PanelContainer", Generator.panel_style(SURFACE, BORDER, 12))
 	for state in ["slider", "grabber_area", "grabber_area_highlight"]:
@@ -141,6 +173,217 @@ func _build_ui() -> void:
 	export_result.title = "Your HUD is ready"
 	export_result.min_size = Vector2i(580, 180)
 	add_child(export_result)
+	_build_ai_studio()
+
+func _build_ai_studio() -> void:
+	ai_pipeline = AIPipeline.new()
+	add_child(ai_pipeline)
+	ai_pipeline.progress.connect(_ai_progress_changed)
+	ai_dialog = AcceptDialog.new()
+	ai_dialog.theme = theme
+	ai_dialog.title = "Local AI prompt studio"
+	ai_dialog.min_size = Vector2i(720, 650)
+	ai_dialog.get_ok_button().text = "Close"
+	add_child(ai_dialog)
+	var body = VBoxContainer.new()
+	body.add_theme_constant_override("separation", 8)
+	ai_dialog.add_child(body)
+	body.add_child(_wrapped("Generate new artwork with your local ComfyUI model. Text, buttons, and bars stay editable.", 13, INK))
+	body.add_child(_label("LOCAL COMFYUI ADDRESS", 11, MUTED))
+	var connection = HBoxContainer.new()
+	body.add_child(connection)
+	ai_endpoint = LineEdit.new()
+	ai_endpoint.text = "http://127.0.0.1:8188"
+	ai_endpoint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	connection.add_child(ai_endpoint)
+	ai_connect_button = _button("Connect & load models")
+	ai_connect_button.add_theme_font_size_override("font_size", 12)
+	ai_connect_button.pressed.connect(_connect_ai)
+	connection.add_child(ai_connect_button)
+	body.add_child(_label("SDXL CHECKPOINT", 11, MUTED))
+	ai_model_picker = OptionButton.new()
+	ai_model_picker.fit_to_longest_item = false
+	ai_model_picker.add_item("Connect to load installed checkpoints")
+	ai_model_picker.disabled = true
+	body.add_child(ai_model_picker)
+	ai_quality_picker = OptionButton.new()
+	ai_quality_picker.add_item("Fast preview · 12 sampling steps")
+	ai_quality_picker.add_item("Detailed artwork · 20 sampling steps")
+	ai_quality_picker.select(1)
+	body.add_child(ai_quality_picker)
+	body.add_child(_label("DESCRIBE YOUR ARTWORK", 11, MUTED))
+	ai_prompt = TextEdit.new()
+	ai_prompt.custom_minimum_size = Vector2(0, 145)
+	ai_prompt.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ai_prompt.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	ai_prompt.placeholder_text = "Describe materials, ornaments, colors, and the mood of your game…"
+	ai_prompt.text = "Hand-painted high fantasy interface with intricate carved frames, aged bronze trim, dragon ornaments, and glowing blue magical crystals."
+	body.add_child(ai_prompt)
+	body.add_child(_wrapped("A full kit generates 19 images, one at a time. On an 8 GB GPU this can take several minutes. Buttons share artwork across their interactive states.", 11, MUTED))
+	var actions = HBoxContainer.new()
+	body.add_child(actions)
+	ai_generate_button = _button("Generate AI artwork", true)
+	ai_generate_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ai_generate_button.pressed.connect(_generate_ai_art)
+	actions.add_child(ai_generate_button)
+	ai_selected_button = _button("Generate selected piece")
+	ai_selected_button.add_theme_font_size_override("font_size", 12)
+	ai_selected_button.disabled = true
+	ai_selected_button.pressed.connect(_generate_selected_ai)
+	actions.add_child(ai_selected_button)
+	ai_cancel_button = _button("Cancel")
+	ai_cancel_button.disabled = true
+	ai_cancel_button.tooltip_text = "Stop this UI Forge job. The current image may still finish in ComfyUI."
+	ai_cancel_button.pressed.connect(_cancel_ai)
+	actions.add_child(ai_cancel_button)
+	ai_progress = ProgressBar.new()
+	ai_progress.custom_minimum_size.y = 18
+	ai_progress.max_value = 19
+	ai_progress.value = 0
+	body.add_child(ai_progress)
+	ai_status = _wrapped("Start ComfyUI, then connect. Choose the SDXL base checkpoint you installed. Your current design stays visible until generation completes.", 12, MUTED)
+	ai_status.custom_minimum_size.y = 52
+	body.add_child(ai_status)
+	var help = LinkButton.new()
+	help.text = "Windows / RTX 50-series setup guide ↗"
+	help.uri = "https://github.com/Ruslanf89/UI_Generator/blob/main/docs/local-ai-guide.md"
+	body.add_child(help)
+	var preferences = ConfigFile.new()
+	if preferences.load("user://local_ai.cfg") == OK:
+		ai_endpoint.text = str(preferences.get_value("studio", "endpoint", ai_endpoint.text))
+		ai_prompt.text = str(preferences.get_value("studio", "prompt", ai_prompt.text))
+		ai_preferred_checkpoint = str(preferences.get_value("studio", "checkpoint", ""))
+		ai_quality_picker.select(clampi(int(preferences.get_value("studio", "quality", 1)), 0, 1))
+
+func _connect_ai() -> Dictionary:
+	if ai_busy:
+		return {"ok": false, "error": "Another AI request is already running."}
+	_set_ai_busy(true)
+	_ai_progress_changed("Connecting to local ComfyUI…", 0, 19)
+	var result: Dictionary = await ai_pipeline.probe(ai_endpoint.text.strip_edges())
+	if result.get("ok", false):
+		ai_model_picker.clear()
+		for checkpoint in result.get("checkpoints", []):
+			ai_model_picker.add_item(str(checkpoint))
+			var index = ai_model_picker.item_count - 1
+			ai_model_picker.set_item_metadata(index, str(checkpoint))
+			if str(checkpoint) == ai_preferred_checkpoint or (ai_preferred_checkpoint.is_empty() and "sd_xl_base" in str(checkpoint).to_lower()):
+				ai_model_picker.select(index)
+		ai_status.text = "Connected. Choose an SDXL-compatible checkpoint, describe the artwork, and generate. The app creates each asset with a batch size of one."
+		_save_ai_preferences()
+	else:
+		ai_model_picker.clear()
+		ai_model_picker.add_item("Connect to load installed checkpoints")
+		ai_status.text = str(result.get("error", "Could not connect to ComfyUI.")).left(600)
+	_set_ai_busy(false)
+	return result
+
+func _generate_ai_art(component: String = "") -> Dictionary:
+	if ai_busy:
+		return {"ok": false, "error": "Another AI request is already running."}
+	if current_config.get("mode", "hud") != "kit":
+		ai_status.text = "Choose Fantasy UI kit and Generate complete kit first."
+		return {"ok": false, "error": ai_status.text}
+	var checkpoint = ""
+	if ai_model_picker.selected >= 0:
+		var selected: Variant = ai_model_picker.get_item_metadata(ai_model_picker.selected)
+		if selected is String:
+			checkpoint = selected
+	if checkpoint.is_empty():
+		ai_status.text = "Click Connect & load models, then choose your installed SDXL checkpoint."
+		ai_dialog.popup_centered(Vector2i(760, 690))
+		return {"ok": false, "error": ai_status.text}
+	if ai_prompt.text.strip_edges().is_empty() or ai_prompt.text.length() > 4000:
+		ai_status.text = "Enter a prompt between 1 and 4,000 characters."
+		return {"ok": false, "error": ai_status.text}
+	preview._finish_drag()
+	if not component.is_empty():
+		ai_dialog.popup_centered(Vector2i(780, 760))
+	_save_ai_preferences()
+	_set_ai_busy(true)
+	_ai_progress_changed("Preparing " + ("the complete kit" if component.is_empty() else component) + "…", 0, 19)
+	var steps = 12 if ai_quality_picker.selected == 0 else 20
+	var result: Dictionary = await ai_pipeline.generate(current_config.duplicate(true), ai_endpoint.text.strip_edges(), checkpoint, ai_prompt.text.strip_edges(), component, steps)
+	if result.get("ok", false):
+		var previous: Dictionary = current_config.get("ai", {}).duplicate(true)
+		layout_history.create_action("Generate AI kit" if component.is_empty() else "Generate AI " + component)
+		layout_history.add_do_method(_apply_ai_result.bind(result.ai.duplicate(true)))
+		layout_history.add_undo_method(_apply_ai_result.bind(previous))
+		layout_history.commit_action()
+		ai_status.text = "AI artwork applied. Review the edges and readability in the preview. You can regenerate one piece or undo this generation with Ctrl+Z."
+	else:
+		ai_status.text = str(result.get("error", "AI generation did not complete.")).left(600) + " Your previous artwork is kept."
+		status_label.text = ai_status.text
+	_set_ai_busy(false)
+	return result
+
+func _apply_ai_result(artwork: Dictionary) -> void:
+	if artwork.is_empty():
+		current_config.erase("ai")
+	else:
+		current_config.ai = artwork.duplicate(true)
+	_sync_ai_controls()
+	_refresh_previews()
+	status_label.text = "AI artwork applied · export includes the accepted PNGs. Ctrl+Z to undo." if current_config.get("ai", {}).get("enabled", false) else "Procedural artwork restored. Positions and sizes are kept."
+
+func _generate_selected_ai() -> Dictionary:
+	var node = preview.hud.get_node_or_null(NodePath(preview.selected_element)) if not preview.selected_element.is_empty() else null
+	if node == null or current_config.get("mode", "hud") != "kit":
+		ai_status.text = "Close AI studio, select a piece in the large preview, then reopen the studio."
+		return {"ok": false, "error": ai_status.text}
+	return await _generate_ai_art(str(node.get_meta("kit_component", node.name)))
+
+func _restore_procedural_art() -> void:
+	if ai_busy or not current_config.get("ai", {}).get("enabled", false):
+		return
+	var previous: Dictionary = current_config.ai.duplicate(true)
+	layout_history.create_action("Restore procedural art")
+	layout_history.add_do_method(_apply_ai_result.bind({}))
+	layout_history.add_undo_method(_apply_ai_result.bind(previous))
+	layout_history.commit_action()
+
+func _set_ai_busy(busy: bool) -> void:
+	ai_busy = busy
+	ai_connect_button.disabled = busy
+	ai_generate_button.disabled = busy
+	ai_cancel_button.disabled = not busy
+	ai_endpoint.editable = not busy
+	ai_prompt.editable = not busy
+	ai_model_picker.disabled = busy or ai_model_picker.item_count == 0 or not ai_model_picker.get_item_metadata(0) is String
+	ai_quality_picker.disabled = busy
+	generate_button.disabled = busy
+	creation_picker.disabled = busy
+	new_ui_button.disabled = busy
+	_sync_ai_controls()
+
+func _sync_ai_controls() -> void:
+	var active = current_config.get("ai", {}).get("enabled", false)
+	accent_picker.disabled = active
+	ai_restore_button.disabled = ai_busy or not active
+	ai_hint.text = "AI artwork keeps its generated colors. Edit the prompt in AI studio to change them. Export includes the PNGs; your game does not need ComfyUI." if active else "Create new artwork from a prompt using ComfyUI on this PC. No API key or per-image fee."
+	if is_instance_valid(preview.hud):
+		_selection_changed(preview.selected_element)
+
+func _ai_progress_changed(message: String, completed: int, total: int) -> void:
+	ai_status.text = message.left(600)
+	ai_progress.max_value = maxi(1, total)
+	ai_progress.value = completed
+	status_label.text = message
+
+func _cancel_ai() -> void:
+	if ai_busy:
+		ai_pipeline.cancel()
+		ai_status.text = "Cancelling this UI Forge job. The current ComfyUI image may still finish."
+
+func _save_ai_preferences() -> void:
+	var preferences = ConfigFile.new()
+	preferences.set_value("studio", "endpoint", ai_endpoint.text)
+	preferences.set_value("studio", "prompt", ai_prompt.text)
+	preferences.set_value("studio", "quality", ai_quality_picker.selected)
+	if ai_model_picker.selected >= 0 and ai_model_picker.get_item_metadata(ai_model_picker.selected) is String:
+		ai_preferred_checkpoint = ai_model_picker.get_item_metadata(ai_model_picker.selected)
+	preferences.set_value("studio", "checkpoint", ai_preferred_checkpoint)
+	preferences.save("user://local_ai.cfg")
 
 func _header(parent: Node) -> void:
 	var row = HBoxContainer.new()
@@ -160,6 +403,7 @@ func _header(parent: Node) -> void:
 	row.add_child(spacer)
 	row.add_child(_label("LOCAL GENERATION   ·   GODOT 4", 11, MUTED))
 	var fresh = _button("+  New UI")
+	new_ui_button = fresh
 	fresh.pressed.connect(_new_ui)
 	row.add_child(fresh)
 	export_button = _button("Export to Godot  ↗", true)
@@ -389,6 +633,18 @@ func _inspector(parent: Node) -> void:
 	kit_controls.add_child(regenerate_button)
 	kit_controls.add_child(_wrapped("Select a piece in the preview to give it new details. Other pieces keep their artwork. Ctrl+Z undoes it.", 11, MUTED))
 	kit_controls.add_child(_wrapped("Menu · HUD · Components\nExport saves all three pages and their shared artwork.", 11, MUTED))
+	kit_controls.add_child(HSeparator.new())
+	kit_controls.add_child(_label("LOCAL AI ART", 11, GREEN))
+	var open_ai = _button("Open AI studio")
+	open_ai.pressed.connect(func(): ai_dialog.popup_centered(Vector2i(780, 760)))
+	kit_controls.add_child(open_ai)
+	ai_hint = _wrapped("Create new artwork from a prompt using ComfyUI on this PC. No API key or per-image fee.", 11, MUTED)
+	kit_controls.add_child(ai_hint)
+	ai_restore_button = _button("Use procedural art")
+	ai_restore_button.add_theme_font_size_override("font_size", 12)
+	ai_restore_button.disabled = true
+	ai_restore_button.pressed.connect(_restore_procedural_art)
+	kit_controls.add_child(ai_restore_button)
 	body.add_child(HSeparator.new())
 	var inspector_body = body
 	art_controls = VBoxContainer.new()
@@ -496,6 +752,9 @@ func _inspector(parent: Node) -> void:
 	body.add_child(_wrapped("Map, ammo, and timers use sample data. Your game supplies the behavior.", 11, MUTED))
 
 func generate() -> void:
+	if ai_busy:
+		status_label.text = "AI artwork is still generating. Cancel it in AI studio before creating a new design."
+		return
 	if creation_picker.selected == 1:
 		_generate_kit()
 		return
@@ -521,6 +780,7 @@ func generate() -> void:
 	updating_controls = false
 	art_controls.show()
 	kit_controls.hide()
+	_sync_ai_controls()
 	select_variant(0)
 	_refresh_previews()
 	health_slider.editable = "health" in selected
@@ -559,6 +819,7 @@ func _generate_kit() -> void:
 	updating_controls = false
 	art_controls.hide()
 	kit_controls.show()
+	_sync_ai_controls()
 	select_variant(0)
 	_refresh_previews()
 	dirty_label.text = "3 matching kit pages"
@@ -566,7 +827,7 @@ func _generate_kit() -> void:
 	status_label.text = "%s kit generated offline · Menu, HUD, and reusable components. Export saves the whole kit." % current_config.style
 
 func _regenerate_selected() -> void:
-	if current_config.get("mode", "hud") != "kit":
+	if ai_busy or current_config.get("mode", "hud") != "kit":
 		return
 	preview._finish_drag()
 	var node = preview.hud.get_node_or_null(NodePath(preview.selected_element)) if not preview.selected_element.is_empty() else null
@@ -574,6 +835,9 @@ func _regenerate_selected() -> void:
 		status_label.text = "Select a kit component in the large preview first."
 		return
 	var component = str(node.get_meta("kit_component", node.name))
+	if current_config.get("ai", {}).get("enabled", false):
+		_generate_ai_art(component)
+		return
 	var overrides: Dictionary = current_config.kit.component_seeds
 	var had_override = overrides.has(component)
 	var previous = int(overrides.get(component, 0))
@@ -620,7 +884,10 @@ func _selection_changed(element: String) -> void:
 	if not is_instance_valid(position_label):
 		return
 	var node = preview.hud.get_node_or_null(NodePath(element)) if not element.is_empty() else null
-	regenerate_button.disabled = node == null or current_config.get("mode", "hud") != "kit"
+	regenerate_button.disabled = ai_busy or node == null or current_config.get("mode", "hud") != "kit"
+	if is_instance_valid(ai_selected_button):
+		ai_selected_button.disabled = regenerate_button.disabled
+		ai_selected_button.tooltip_text = "Generate AI artwork only for " + element if node != null else "Close the studio and select a piece in the large preview first."
 	if node != null:
 		_position_changed(element, node.position)
 	else:
@@ -758,6 +1025,9 @@ func _change_value(key: String, value: float) -> void:
 			view.hud.get_node(key.capitalize() + "/Amount").text = "%d / 100" % value
 
 func _new_ui() -> void:
+	if ai_busy:
+		status_label.text = "Cancel the current AI job before starting a new UI."
+		return
 	_set_creation_mode(0)
 	genre_picker.select(0)
 	resolution_picker.select(0)

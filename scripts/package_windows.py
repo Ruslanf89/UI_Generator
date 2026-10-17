@@ -70,7 +70,25 @@ CREATE A COMPLETE FANTASY KIT
    Copy the entire export folder into your game. Use menu.tscn for the menu,
    hud.tscn for gameplay, and components.tscn as a library to copy controls from.
    Buttons have hover/pressed/disabled/focus states; connect actions in your game.
-All artwork is procedural and works offline without an account or API key.
+The procedural mode works offline without an account or API key.
+
+GENERATE NEW ARTWORK FROM A PROMPT (LOCAL AI)
+1. Follow docs/local-ai-guide.md to install the current official NVIDIA ComfyUI
+   portable build and the free SDXL Base 1.0 checkpoint. Keep ComfyUI running.
+   RTX 50-series cards require a current compatible PyTorch/CUDA runtime.
+2. Generate a Fantasy UI kit, then click Open AI studio in the right inspector.
+3. Leave http://127.0.0.1:8188 selected, click Connect & load models, and choose
+   the installed SDXL checkpoint. Type your prompt and choose sampling quality.
+4. For a quick experiment, select a piece in the preview before opening the
+   studio and click Generate selected piece. Or click Generate AI artwork for
+   the full kit. It uses 19 images generated sequentially,
+   so allow several minutes. Existing artwork stays until the job completes.
+5. Regenerate selected requests new AI artwork for one piece; Ctrl+Z undoes it.
+   Use procedural art restores the built-in artwork. Cancel stops UI Forge's
+   remaining requests; a current ComfyUI image may still finish.
+The local model has no per-image API fee. Model downloads and initial setup
+need internet; generation can run offline afterward. Your exported game only
+needs its scenes/theme/PNGs. It does not need ComfyUI or the model.
 
 EXPORT AND USE IN GODOT
 1. Create a folder in Documents, for example UIForgeExports.
@@ -86,6 +104,7 @@ EXPORT AND USE IN GODOT
 DETAILED GUIDES INCLUDED IN THIS DOWNLOAD
 docs/windows-guide.md: download choices, launch steps, first HUD, and fixes.
 docs/godot-guide.md: running the source project, importing a HUD, and a health demo.
+docs/local-ai-guide.md: Windows / RTX 5060 setup and local prompt-to-art generation.
 docs/examples/health_demo.gd: a complete Space-to-damage, R-to-heal example.
 Open .md files in a text editor, or read formatted versions online:
 https://github.com/Ruslanf89/UI_Generator/blob/main/docs/windows-guide.md
@@ -95,7 +114,8 @@ KEEP YOUR WORK
 Designs are held in memory. Export before closing the app or clicking New UI.
 Loading exported presets back into UI Forge is not implemented. Generated
 controls can be edited directly in Godot. Maps, ammo, timers, and ability slots
-use example data; your game supplies behavior. Generation uses local templates.
+use example data; your game supplies behavior. Layouts use editable templates;
+optional local AI creates artwork from your prompt.
 
 This development package uses the full official Godot 4.6.3 Windows engine.
 The engine archive was verified against the published SHA-512 checksum.
@@ -195,7 +215,8 @@ def main() -> int:
         (package / "README.txt").write_text(GUIDE, encoding="utf-8")
         guides = (
             "README.md", "docs/windows-guide.md", "docs/godot-guide.md",
-            "docs/development.md", "docs/examples/health_demo.gd", "docs/screenshot.png", "docs/materials.png", "docs/fantasy-kits.png",
+            "docs/development.md", "docs/local-ai-guide.md", "docs/examples/health_demo.gd",
+            "docs/screenshot.png", "docs/materials.png", "docs/fantasy-kits.png", "docs/local-ai-studio.png",
         )
         for relative in guides:
             destination = package / relative

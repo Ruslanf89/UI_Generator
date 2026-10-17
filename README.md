@@ -13,6 +13,7 @@ preview, then export editable Godot scenes, a theme, and artwork.
 | Run the desktop app on Windows | [Windows: download, extract, launch, and create your first HUD](docs/windows-guide.md) |
 | Run UI Forge using the Godot editor | [Godot: open the source project and press Play](docs/godot-guide.md#run-ui-forge-from-source) |
 | Create a matching fantasy menu and HUD | [Windows guide: create a fantasy UI kit](docs/windows-guide.md#create-a-fantasy-ui-kit) |
+| Generate artwork from a text prompt on your NVIDIA GPU | [Local AI: Windows setup with ComfyUI and SDXL](docs/local-ai-guide.md) |
 | Add a generated HUD to your own game | [Godot: import the HUD and connect health to gameplay](docs/godot-guide.md#add-an-exported-hud-to-your-game) |
 | Use a complete exported kit in your game | [Godot: add an exported fantasy kit](docs/godot-guide.md#add-an-exported-fantasy-kit-to-your-game) |
 | Test the code or build a Windows ZIP yourself | [Development and packaging](docs/development.md) |
@@ -55,9 +56,22 @@ editable controls; connect menu actions and sample values to your game code.
 
 ![Illustrated fantasy and medieval pixel kits](docs/fantasy-kits.png)
 
-Every image is generated procedurally offline. No downloaded illustrations,
-AI service, or API key is used. Medieval pixel artwork uses a coarse pixel grid
-and nearest filtering; whole-number game viewport scaling keeps it sharpest.
+The built-in kit artwork is procedural and needs no separate model. For
+**prompt-generated images**, open **Local AI Art → Open AI studio** on the right
+and connect to ComfyUI running on your PC. Choose an installed SDXL checkpoint,
+describe the art, and click **Generate AI artwork**. This uses a real local image
+model; no provider key or image API fee is required. Follow the
+[Windows setup guide](docs/local-ai-guide.md) first. ComfyUI and model downloads
+are separate from UI Forge.
+
+The full AI batch is applied after it succeeds. You can then regenerate a
+selected component, undo accepted changes, or choose **Use procedural art**.
+Positions, sizes, native text, and bars remain editable. AI images may need
+prompt retries and edge review; their colors come from the prompt.
+
+Built-in Medieval pixel artwork uses a coarse pixel grid and nearest filtering;
+whole-number game viewport scaling keeps it sharpest. A model's interpretation
+of a pixel-art prompt may vary.
 
 ## Create and export your first HUD
 
@@ -88,6 +102,8 @@ The exported scene keeps your custom element positions and individual scales.
   and Components pages and regeneration of individual pieces.
 - Three kit materials and three decoration levels, with procedural icons,
   button states, framed panels, health/mana bars, and inventory/ability samples.
+- Optional local ComfyUI/SDXL prompt-to-art generation for fantasy kits, with
+  whole-kit generation, individual regeneration, and portable PNG exports.
 - Six game types: FPS, RPG, RTS, Racing, Survival, and Platformer.
 - Six styles: Military, Fantasy, Modern, Horror, Sci-fi, and Minimal.
 - Twelve optional HUD components and three coordinated layout variations.
@@ -102,8 +118,10 @@ The exported scene keeps your custom element positions and individual scales.
 
 Generation uses local templates. Menus, maps, ammo, timers, inventory, and ability
 slots use example data; connect them to your game logic. The preview background
-is not included in exports. Artwork is generated procedurally on your PC;
-it does not use an AI image service or require a key.
+is not included in exports. Built-in artwork runs procedurally on your PC;
+optional AI artwork runs through a separately installed local ComfyUI model.
+Neither route requires a provider key. Exported games need only their generated
+scenes, theme, and images.
 
 ![Generated material surfaces](docs/materials.png)
 

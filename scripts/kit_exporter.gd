@@ -70,6 +70,8 @@ static func export_kit(config: Dictionary, selected_page: int, parent_directory:
 	manifest.pages = Generator.PAGES.duplicate()
 	manifest.selected_page = clampi(selected_page, 0, Generator.PAGES.size() - 1)
 	manifest.generator = "UI Forge fantasy kit"
+	if manifest.get("ai") is Dictionary:
+		manifest.ai = _portable_ai_provenance(manifest.ai)
 	manifest.positions = {}
 	for page in config.get("positions", {}):
 		manifest.positions[page] = {}
@@ -231,10 +233,69 @@ static func _remove_partial(folder: String) -> void:
 			DirAccess.remove_absolute(folder.path_join(filename))
 	DirAccess.remove_absolute(folder)
 
+## Keep the source settings useful without exporting machine-specific cache or
+## connection details. Asset hashes describe the original generated images;
+## the exported artwork can also include resizing and procedural decoration.
+static func _portable_ai_provenance(source: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for key in source:
+		var field = str(key).to_lower()
+		if _is_local_ai_field(field) or _is_local_ai_path(str(key)):
+			continue
+		var value: Variant = source[key]
+		if value is String and _is_local_ai_path(value) and not field.ends_with("prompt"):
+			# Model names are useful provenance even when a provider reports a
+			# local model path instead of its usual checkpoint identifier.
+			if field in ["checkpoint", "model", "checkpoint_name", "model_name"]:
+				result[key] = str(value).replace("\\", "/").get_file()
+			continue
+		result[key] = _portable_ai_value(value)
+	return result
+
+static func _portable_ai_value(value: Variant) -> Variant:
+	if value is Dictionary:
+		return _portable_ai_provenance(value)
+	if value is Array:
+		var result: Array = []
+		for item in value:
+			if item is String and _is_local_ai_path(item):
+				continue
+			result.append(_portable_ai_value(item))
+		return result
+	return value
+
+static func _is_local_ai_field(field: String) -> bool:
+	return field in ["path", "paths", "file", "directory", "cache", "cache_dir", "cache_directory", "cache_key", "cache_root", "local_cache", "base_url", "server_url", "comfyui_url", "endpoint", "api_key", "token"] \
+		or field.ends_with("_path") or field.ends_with("_paths")
+
+static func _is_local_ai_path(value: String) -> bool:
+	var normalized = value.replace("\\", "/")
+	return normalized.is_absolute_path() or normalized.begins_with("user://") \
+		or normalized.begins_with("res://") or normalized.begins_with("file://")
+
 static func _instructions(config: Dictionary) -> String:
+	var ai: Dictionary = config.get("ai", {})
+	var source_note = "Procedural artwork settings and seeds are recorded in preset.json."
+	var ai_instructions = ""
+	if ai.get("enabled", false):
+		source_note = "Artwork combines procedural frames with any locally generated ComfyUI source images."
+		ai_instructions = """
+## Optional ComfyUI artwork
+
+ComfyUI was an optional source of locally generated artwork in UI Forge. These
+exported scenes need no ComfyUI server, AI model, generator script, or network
+connection. The art folder contains the PNG resources used by the native controls.
+
+preset.json retains recorded prompts, checkpoint names, seeds, source image
+hashes, dimensions, and component revisions when available. Machine-specific
+cache paths and server connection settings are excluded. Source hashes describe
+the original generated images; exported PNGs may include resizing or procedural
+decoration. Recorded seeds help track generation settings but do not guarantee
+bit-for-bit reproduction across model versions, hardware, or ComfyUI workflows.
+"""
 	return """# UI Forge fantasy UI kit
 
-%s. All artwork was generated locally from the seed in preset.json.
+%s. %s
 
 ## Add this kit to your Godot game
 
@@ -278,4 +339,4 @@ preset.json records the complete kit seed, material and ornament settings,
 individual component seeds, page positions, and scales. Loading this file back
 into UI Forge is not currently supported. The exported scenes remain editable
 in Godot independently of the generator.
-""" % str(config.get("style", "Fantasy"))
+%s""" % [str(config.get("style", "Fantasy")), source_note, ai_instructions]

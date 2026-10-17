@@ -13,6 +13,7 @@ repository root
 godot --headless --editor --path . --import --quit
 godot --headless --path . --script tests/run_tests.gd
 godot --headless --path . --script tests/run_kit_tests.gd
+godot --headless --path . --script tests/run_ai_tests.gd
 godot --headless --path . --quit-after 6
 ```
 
@@ -39,6 +40,15 @@ exports must retain each page's custom transforms and load in a separate game
 project with all PNGs imported. Visual inspection is still needed for text
 readability, ornament placement, and the pixel grid at different window sizes.
 
+The local AI suite uses a simulated ComfyUI HTTP server. It exercises connection
+and checkpoint discovery, workflow submission, queued-job polling, image
+download, errors, cancellation, and the app's accepted-artwork behavior. These
+checks do not load SDXL or measure real NVIDIA GPU performance. Real inference,
+RTX 5060/CUDA compatibility on the user's PC, image quality, and background
+removal quality still require the manual test in the
+[local AI guide](local-ai-guide.md). No image-quality claim should be based on
+the HTTP fixture.
+
 In a cloud shell with a read-only home directory, initialize writable runtime
 locations before Godot commands:
 
@@ -63,11 +73,24 @@ PNGs). Preserve component identifiers when sharing artwork across pages: a
 component seed override should change that component everywhere it appears,
 while leaving other artwork and all transforms intact.
 
-Kit artwork is generated entirely offline. Additions should remain procedural
-and should not introduce downloaded illustrations, an image-generation service,
-or a provider key. Keep export scenes independent of generator scripts. Button
-state textures and textures inside StyleBoxTexture resources must be included
-under `art/`, even when they are not visible in a normal-state preview.
+The default kit remains entirely procedural. Optional prompt generation uses
+`scripts/comfy_client.gd` for the local ComfyUI API,
+`scripts/ai_pipeline.gd` for coordinated requests, and `scripts/ai_art.gd` for
+artwork preparation and integration. The app does not download models or launch
+ComfyUI. The supported workflow uses built-in SDXL nodes and batch size 1;
+models and runtime dependencies are installed separately by the user.
+
+Keep the local endpoint restricted to loopback addresses. A failed or cancelled
+batch must preserve the current accepted kit, and cancelling UI Forge's wait
+must not interrupt unrelated ComfyUI jobs. Undo/redo should reuse accepted image
+data rather than queueing another model inference. The prompt, endpoint, and
+model preferences are local app settings, separate from generated designs.
+
+Keep export scenes independent of generator scripts, ComfyUI, and model files.
+Button state textures and textures inside StyleBoxTexture resources must be
+included under `art/`, even when they are not visible in a normal-state preview.
+Copying an AI export into a separate Godot project must preserve its PNGs and
+editable controls without a running local model.
 
 ## Package a standalone app
 
@@ -81,7 +104,7 @@ python3 scripts/package_windows.py
 The script downloads the official Godot Windows engine over HTTPS, verifies
 its pinned published SHA-512 checksum, exports the app with Windows settings,
 and creates `build/UIForge-windows-x86_64.zip`. The ZIP includes the executable,
-companion PCK, end-user Windows/Godot guides, a health-bar example, SHA-256
+companion PCK, end-user Windows/Godot/local-AI guides, a health-bar example, SHA-256
 checksums, and engine license notices.
 It uses the full engine; a production export with official templates is smaller.
 Packaging, archive integrity, and the resource pack are checked on Linux;

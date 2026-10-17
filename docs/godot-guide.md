@@ -161,6 +161,14 @@ then click **Generate complete kit**. Arrange components on the **Menu**,
 **HUD**, and **Components** pages. Select a piece and use **Regenerate selected**
 to change only its artwork; **Ctrl+Z** restores the previous version.
 
+For prompt-generated images, follow the
+[local AI setup guide](local-ai-guide.md), then use **Local AI Art → Open AI
+studio** in the kit inspector. Connect to local ComfyUI, select an SDXL
+checkpoint, enter a description, and choose **Generate AI artwork**. The
+existing kit stays intact until the requested batch succeeds. Once AI art is
+active, **Regenerate selected** calls the model for only that component's art
+roles. **Use procedural art** restores the built-in images.
+
 Click **Export to Godot** and choose an existing writable folder. Every export
 contains all three pages, regardless of the page visible in the designer:
 
@@ -196,6 +204,8 @@ uiforge_kit_illustrated_fantasy/
 These are native Godot Control scenes. They need no UI Forge scripts, plugin,
 or connection to the generator. The preview scenery is not exported. Each
 page retains the positions and sizes you set in the designer.
+AI-generated kit exports also work without ComfyUI or the model in your game:
+the accepted artwork is saved as PNGs. Copy all those images with the scenes.
 
 ### 3. Edit labels and connect menu buttons
 
@@ -255,6 +265,10 @@ Expand a StyleBoxTexture to inspect or replace its texture. Keep every PNG in
 `art/`: some are only shown during button interaction. Changing a PNG outside
 Godot updates the controls that reference it after reimport. Labels, button
 text, and ProgressBar values stay editable independently of the artwork.
+This applies to procedural and AI-generated exports. AI images retain the
+colors produced by the model; adjust the prompt and regenerate in UI Forge,
+or edit the exported image, to change that palette. Review image edges and
+matte removal before using the kit in your game.
 
 All pages use a transparent **1280 × 720** design canvas with uniform scaling.
 **Medieval pixel** preserves nearest filtering for images. Fractional scaling
@@ -262,8 +276,8 @@ can make pixels uneven; use whole-number viewport scaling when a strict pixel
 grid is important for your game. The selected target resolution is recorded in
 the export; it does not change your game's Project Settings.
 
-`preset.json` records the kit seed, material, decoration, individual component
-seeds, positions, and scales. It is a record of the design; importing it back
+`preset.json` records the design settings, seed information, positions, and
+scales. The exported PNGs preserve accepted AI artwork. Importing the preset back
 into UI Forge is not implemented. Export before generating a new kit or closing
 the designer. Subsequent exports create separate folders and do not merge
 your Godot scene edits.
@@ -426,6 +440,9 @@ in Godot's 2D editor before running it.
 | Preview rendering, mouse selection, dragging, and resizing | `scripts/hud_preview.gd` |
 | Fantasy kit scenes and native control layout | `scripts/kit_generator.gd` |
 | Fantasy kit procedural shapes, surfaces, ornaments, and icons | `scripts/kit_art.gd` |
+| Local ComfyUI connection, model discovery, and image requests | `scripts/comfy_client.gd` |
+| Local AI batch generation and progress | `scripts/ai_pipeline.gd` |
+| AI artwork preparation and integration | `scripts/ai_art.gd` |
 | Fantasy kit scene/theme/PNG export | `scripts/kit_exporter.gd` |
 | Original HUD component layouts and themes | `scripts/hud_generator.gd` |
 | Original HUD material textures and frames | `scripts/hud_art.gd` |

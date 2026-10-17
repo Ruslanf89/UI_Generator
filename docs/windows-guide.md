@@ -79,6 +79,7 @@ extracted folder. Keep the whole app folder together when moving it.
 | **Arrange Elements**, in the right panel | Selected component coordinates, grid snapping, and layout reset |
 | **Offline Material Art**, in the right panel | Surface material, frame detail, texture size, wear, opacity, and seed |
 | **Refine One Piece**, in the right panel | **Regenerate selected** changes one kit component's artwork |
+| **Local AI Art**, in the right panel | **Open AI studio** opens the prompt/model dialog for local ComfyUI generation |
 | **New UI**, at the top | Resets the brief and customizations to the initial FPS/Military design |
 | **Export to Godot**, at the top | Saves the selected HUD layout, or all three kit pages, into a new folder |
 | Status line, at the bottom | Generation messages, export location, and errors |
@@ -219,8 +220,9 @@ matching shapes, materials, colors, and ornaments.
 | **HUD** | Health/mana bars, currency, minimap sample, objective panel, ability buttons, and quest-log button |
 | **Components** | Framed panel, button-state examples, inventory slots, health/mana bars, and procedural icons |
 
-Every image is drawn procedurally on your PC. Both styles work offline and
-need no image downloads, AI service, account, or key. The controls and sample
+The kit starts with artwork drawn procedurally on your PC. Both built-in styles
+work offline without a separate model. You can also generate images from a
+prompt using local ComfyUI and SDXL, as described below. The controls and sample
 screens form a starting kit; the app does not create gameplay logic.
 
 ### Refine one piece without replacing the kit
@@ -242,7 +244,8 @@ or **TitleBanner**, receives the change on each of those pages.
 Drag pieces and use their corner handles as described above. **Accent Color**,
 **HUD Size**, and the live **Health**/**Mana** sliders work for kits too.
 **Offline Material Art** is hidden in kit mode; the material and decoration
-choices on the left supply the kit artwork.
+choices on the left supply the built-in kit artwork. The accent picker is
+disabled while AI images are active; their colors come from the artwork prompt.
 
 Changing the kit style, material, decoration, or resolution marks the brief as
 pending. **Generate complete kit** applies it by creating a fresh entire kit
@@ -253,8 +256,48 @@ way to change one piece while preserving the current kit.
 Buttons in the designer are selected and arranged with the mouse. Their game
 actions become available after export, when you connect their native signals
 in Godot. The **Components** page displays examples of the button states.
-Pixel artwork uses nearest filtering. Fractional viewport scaling can make
+Built-in pixel artwork uses nearest filtering. Fractional viewport scaling can make
 pixel widths uneven; use whole-number game scaling for the sharpest pixel grid.
+
+### Generate images from a prompt with local AI
+
+For this route, first follow **[Local AI artwork on Windows](local-ai-guide.md)**.
+It explains the current NVIDIA portable runtime, SDXL checkpoint download,
+RTX 5060 8 GB setup, and a single-image ComfyUI test. You need no provider key
+or image API subscription. The model runs on your PC; the initial downloads
+and storage are separate from the UI Forge app.
+
+1. Start ComfyUI with **run_nvidia_gpu.bat** and keep its command window open.
+   Confirm that **http://127.0.0.1:8188** works in your browser.
+2. In UI Forge, generate a **Fantasy UI kit** and scroll the inspector to
+   **Local AI Art → Open AI studio**.
+3. In the studio dialog, leave the local address at
+   **http://127.0.0.1:8188**, then click **Connect & load models**.
+4. Choose your installed **sd_xl_base_1.0.safetensors** checkpoint.
+5. Describe the artwork in the prompt box: colors, materials, silhouettes,
+   trim, and visual treatment. Click **Generate AI artwork**.
+6. Wait for the complete batch. UI Forge generates the different art roles
+   one image at a time; the first full kit can take several minutes.
+7. Review all three pages. **Regenerate selected** now calls the model for
+   only the selected component's art roles. Undo restores the accepted images.
+8. Choose **Use procedural art** to return to the built-in artwork, or export
+   the AI kit when you like the result.
+
+Your current kit remains intact until the requested batch succeeds. **Cancel**
+keeps the accepted kit and stops further submissions; an image already running
+in ComfyUI may still finish. UI Forge does not interrupt other ComfyUI jobs.
+
+The model supplies images; Labels, button text, ProgressBars, and the layout
+stay editable. Matte removal can leave edge defects, and separately generated
+pieces can vary. Adjust the prompt and retry as needed. Avoid magenta subject
+details because the workflow uses a magenta background for removal. AI images
+keep their generated colors, so edit the prompt and regenerate to change the
+palette. The built-in style selection does not guarantee a model will produce
+a strict pixel grid.
+
+Export before closing the app or starting a new complete kit. The local server,
+model, and prompt preferences are remembered; generated designs cannot yet be
+reopened. Your exported game needs the scenes/theme/PNGs, without ComfyUI or SDXL.
 
 ## 7. Export your HUD or kit
 
@@ -316,8 +359,10 @@ Keep the **whole folder** together. `menu.tscn` is the menu example,
 `hud.tscn` is the gameplay overlay, and `components.tscn` is a collection of
 matching reusable controls. They share `kit_theme.tres` and use images in
 `art/`. Some button images appear only on hover, focus, or press, so keep all
-of them. `preset.json` records the complete kit seed and individual component
-seeds, settings, positions, and sizes; it cannot yet be reopened in UI Forge.
+of them. `preset.json` records the design settings, positions, sizes, and seed
+information. AI exports also include their accepted generated PNGs; those
+images are the artwork your game uses. The preset cannot yet be reopened in
+UI Forge.
 
 Continue with [Add an exported fantasy kit to your game](godot-guide.md#add-an-exported-fantasy-kit-to-your-game).
 
@@ -350,6 +395,8 @@ background is illustrative and is not exported. Generation uses local templates.
 | Kit material/style changes are not visible | Click **Generate complete kit** to apply the pending brief. Export the current kit first if you want to keep it. |
 | A kit exports pages you were not viewing | This is expected: every kit export includes Menu, HUD, and Components. |
 | Menu buttons do not start a game | Export the kit, add the menu to your game, and connect its Button signals to your game code. |
+| Local AI cannot connect, or generation fails | Follow the [local AI troubleshooting guide](local-ai-guide.md#troubleshooting-an-rtx-5060-8-gb-setup); test a single SDXL image in ComfyUI first. |
+| Accent color is disabled | AI artwork retains its generated colors. Change the prompt and generate new artwork, or choose **Use procedural art**. |
 | Export fails | Choose an existing writable folder, such as a folder in Documents. Read the status line for the specific error. |
 | Map or ammo is not changing in a game | Those are sample controls; follow the Godot integration guide and connect gameplay data. |
 
