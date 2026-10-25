@@ -397,7 +397,7 @@ func _test_export() -> void:
 	var config := generated_config.duplicate(true)
 	config.health = 43
 	config.mana = 28
-	config.positions["1"] = {"Health": Vector2(60, 580)}
+	config.positions["1"] = {"Health": Vector2(60, 300)}
 	config.element_scales["1"] = {"Health": 1.25}
 	var exported: Dictionary = Exporter.export_kit(config, 1, scratch)
 	check(exported.ok, "A kit containing generated artwork exports successfully")
@@ -451,7 +451,7 @@ func verify():
                     return
         if filename == "hud":
             var health = elements.get_node("Health")
-            if health.position != Vector2(60, 580) or not is_equal_approx(health.scale.x, 1.25) or health.get_node("Value").value != 43:
+            if health.position != Vector2(60, 300) or not is_equal_approx(health.scale.x, 1.25) or health.get_node("Value").value != 43:
                 quit(5)
                 return
             health.get_node("Value").value = 17
@@ -465,6 +465,10 @@ func verify():
 func script_free(node):
     if node.get_script() != null:
         return false
+    if node is TextureProgressBar:
+        for texture in [node.texture_under, node.texture_progress, node.texture_over]:
+            if texture != null and (texture.get_image() == null or not texture.resource_path.begins_with("res://generated_kit/art/")):
+                return false
     for child in node.get_children():
         if not script_free(child):
             return false

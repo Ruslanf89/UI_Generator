@@ -32,7 +32,7 @@ func _run() -> void:
 	await _test_editor()
 	_test_export()
 	if failures.is_empty():
-		print("KIT_PASS: %d checks. Both offline styles, complete kits, individual regeneration, and portable Godot exports." % checks)
+		print("KIT_PASS: %d checks. Offline styles, complete kits, individual regeneration, and portable Godot exports." % checks)
 		quit(0)
 	else:
 		printerr("KIT_FAILED: %d of %d checks. Scratch files: %s" % [failures.size(), checks, scratch])
@@ -61,11 +61,11 @@ func _test_generated_kits() -> void:
 				if page == 0:
 					check(_count_type(generated, "Button") >= 4, brief + " has usable menu buttons")
 				if generated.has_node("Health/Value"):
-					var health: ProgressBar = generated.get_node("Health/Value")
+					var health: Range = generated.get_node("Health/Value")
 					health.value = 31
 					check(health.value == 31 and health.get_script() == null, brief + " keeps health live and editable")
 				if generated.has_node("Mana/Value"):
-					var mana: ProgressBar = generated.get_node("Mana/Value")
+					var mana: Range = generated.get_node("Mana/Value")
 					mana.value = 19
 					check(mana.value == 19, brief + " keeps mana live and editable")
 				check(_texture_snapshot(generated).size() >= 7, brief + " has illustrated components")
@@ -148,6 +148,8 @@ func _test_editor() -> void:
 	await process_frame
 	app.creation_picker.select(1)
 	app._set_creation_mode(1)
+	check(app.kit_surprise.button_pressed, "New kit briefs default to Surprise Everything")
+	app.kit_surprise.button_pressed = false
 	check(app.current_config.get("mode", "hud") == "hud", "Changing the pending brief keeps the current design until Generate")
 	app.kit_style_picker.select(1)
 	app.kit_material_picker.select(1)
@@ -207,8 +209,74 @@ func _test_editor() -> void:
 	seed_entry.text_changed.emit(seed_entry.text)
 	app.generate()
 	check(int(app.current_config.kit.seed) == 202704 and app.kit_seed_lock.button_pressed, "Generate commits a seed typed in the same frame before selecting a design")
+	await process_frame
+	await _test_semantic_regeneration(app)
+	_test_surprise_generation(app)
 	app.queue_free()
 	await process_frame
+
+func _test_semantic_regeneration(app: Control) -> void:
+	app.kit_surprise.button_pressed = false
+	app.kit_map_picker.select(0)
+	app.kit_resource_picker.select(0)
+	app.generate()
+	app.select_variant(1)
+	for component in ["Minimap", "Health", "Mana"]:
+		var before := _texture_snapshot(app.preview.hud)
+		var geometry := _layout_signature(app.preview.hud)
+		var property := "map_shape" if component == "Minimap" else "stat_presentation"
+		var previous: String = app.preview.hud.get_node(component).get_meta(property)
+		app.preview.selected_element = component
+		app._regenerate_selected()
+		var after := _texture_snapshot(app.preview.hud)
+		var unchanged := true
+		var changed := false
+		for path in before:
+			if str(path).begins_with(component + "/"):
+				changed = changed or before[path] != after.get(path)
+			else:
+				unchanged = unchanged and before[path] == after.get(path)
+		check(app.preview.hud.get_node(component).get_meta(property) != previous and changed, "Regenerating " + component + " changes its actual semantic shape and artwork")
+		check(unchanged and _layout_signature(app.preview.hud) == geometry, "Regenerating " + component + " preserves every other image and the complete layout")
+		app.layout_history.undo()
+		check(_texture_snapshot(app.preview.hud) == before, "Undo restores the previous " + component + " form and all its textures")
+	await process_frame
+
+func _test_surprise_generation(app: Control) -> void:
+	app.kit_surprise.button_pressed = true
+	app.kit_seed.value = 720
+	app.kit_seed_lock.button_pressed = true
+	app.generate()
+	var expected_brief: Dictionary = Design.surprise_brief(720)
+	check(int(app.current_config.kit.seed) == 720 and app.current_config.style == expected_brief.style and app.current_config.kit.design == expected_brief.design and app.current_config.kit.material == expected_brief.material, "Immediate programmatic seed generation uses 720 and its matching surprise brief")
+	app.select_variant(1)
+	var expected: Dictionary = Design.recipe(app.current_config)
+	check(app.preview.hud.get_node("Minimap").get_meta("map_shape") == expected.map_shape and app.preview.hud.get_node("Health").get_meta("stat_presentation") == expected.stat_presentation, "The seeded surprise recipe produces matching native map and resource shapes")
+	app.kit_seed_lock.button_pressed = false
+	var prior: Dictionary = {}
+	var signatures := {}
+	for iteration in range(4):
+		app.generate()
+		app.select_variant(1)
+		var recipe: Dictionary = Design.recipe(app.current_config)
+		var choices := {"style": app.current_config.style, "motif": recipe.motif, "map": app.preview.hud.get_node("Minimap").get_meta("map_shape"), "stat": app.preview.hud.get_node("Health").get_meta("stat_presentation"), "layout": recipe.layout}
+		check(app.current_config.kit.surprise, "Fresh surprise generation records its mode")
+		if not prior.is_empty():
+			var all_changed := true
+			for key in choices:
+				all_changed = all_changed and choices[key] != prior[key]
+			check(all_changed, "Fresh surprise generation changes the visible style, motif, map, stat, and composition")
+		signatures[Design.generation_signature(app.current_config)] = true
+		prior = choices
+	check(signatures.size() == 4, "Repeated surprise generation produces four distinct complete briefs")
+	var seed_value := int(app.current_config.kit.seed)
+	var signature: String = Design.generation_signature(app.current_config)
+	var geometry := _layout_signature(app.preview.hud)
+	var artwork := _texture_snapshot(app.preview.hud)
+	app.kit_seed_lock.button_pressed = true
+	app.generate()
+	app.select_variant(1)
+	check(int(app.current_config.kit.seed) == seed_value and Design.generation_signature(app.current_config) == signature and _layout_signature(app.preview.hud) == geometry and _texture_snapshot(app.preview.hud) == artwork, "Locked Surprise Everything reproduces the actual motif, contours, layout, and textures exactly")
 
 func _test_structural_art() -> void:
 	for style in Kit.STYLES:
@@ -238,10 +306,12 @@ func _test_structural_art() -> void:
 		var family_edges := {}
 		for family in Design.FAMILIES.slice(1):
 			config.kit.design = family
-			var texture: ImageTexture = Art.texture(config, Vector2(280, 180), "SamplePanel", "panel")
+			# Full-height panels reserve a crest cap; compact panels deliberately
+			# share their palette's quiet border to keep text readable.
+			var texture: ImageTexture = Art.texture(config, Vector2(348, 364), "SamplePanel", "panel")
 			family_edges[_edge_signature(texture.get_image())] = true
 			check(texture.get_meta("kit_art_family", "") == family, style + " renders the chosen " + family + " design language")
-		check(family_edges.size() >= 3, style + " families change rendered border and ornament edge patterns")
+		check(family_edges.size() == Design.FAMILIES.size() - 1, style + " renders a distinct border and ornament pattern for every motif language")
 		for role in ["icon_sword", "icon_gear", "icon_bag"]:
 			var icon_shapes := {}
 			for seed in [0, 16, 32, 48, 64, 80]:
@@ -274,10 +344,14 @@ func _test_seeded_layouts() -> void:
 				_check_composition(generated, style + " " + Kit.PAGES[page] + " recipe " + str(layout))
 				var textures: Array[Texture2D] = []
 				_collect_art_resources(generated, textures)
-				var consistent := not textures.is_empty()
+				var consistent := true
+				var art_count := 0
 				for texture in textures:
+					if not texture.has_meta("kit_art_role"):
+						continue # White utility masks are independent of the art family.
+					art_count += 1
 					consistent = consistent and texture.get_meta("kit_art_family", "") == expected.family
-				check(consistent, style + " " + Kit.PAGES[page] + " keeps all frames, states, fills, and icons in one family")
+				check(consistent and art_count > 0, style + " " + Kit.PAGES[page] + " keeps all frames, states, fills, and icons in one family")
 				generated.free()
 		for page in [0, 1]:
 			check(rendered_layouts[page].size() >= 4, style + " " + Kit.PAGES[page] + " has four different rendered position and size arrangements")
@@ -355,6 +429,11 @@ func _edge_signature(image: Image) -> PackedByteArray:
 func _collect_art_resources(node: Node, textures: Array[Texture2D]) -> void:
 	if node is TextureRect and node.texture != null:
 		textures.append(node.texture)
+	if node is TextureProgressBar:
+		for property in ["texture_under", "texture_progress", "texture_over"]:
+			var texture: Texture2D = node.get(property)
+			if texture != null:
+				textures.append(texture)
 	if node is Control:
 		var styles: Array[String] = []
 		if node is Button:
@@ -377,7 +456,7 @@ func _test_export() -> void:
 	config.kit.design = "Runic forge"
 	# Keep this deliberately moved command clear of the preset command row so
 	# the native input check targets the same component whose transform we verify.
-	config.positions = {"0": {"ContinueButton": Vector2(140, 130)}, "1": {"Health": Vector2(60, 580)}}
+	config.positions = {"0": {"ContinueButton": Vector2(140, 130)}, "1": {"Health": Vector2(60, 300)}}
 	config.element_scales = {"0": {"ContinueButton": 1.15}, "1": {"Health": 1.25}}
 	config.health = 43
 	config.mana = 28
@@ -445,12 +524,17 @@ func verify():
                 return
         if filename == "hud":
             var health = elements.get_node("Health")
-            if health.position != Vector2(60, 580) or not is_equal_approx(health.scale.x, 1.25) or health.get_node("Value").value != 43:
+            if health.position != Vector2(60, 300) or not is_equal_approx(health.scale.x, 1.25) or health.get_node("Value").value != 43:
                 quit(5)
                 return
             health.get_node("Value").value = 17
             if health.get_node("Value").value != 17 or elements.get_node("Mana/Value").value != 28:
                 quit(6)
+                return
+            health.get_node("Value").max_value = 200
+            health.get_node("Value").value = 150
+            if health.get_node("Value").value != 150:
+                quit(8)
                 return
         scene.queue_free()
         await process_frame
@@ -488,6 +572,10 @@ func check_textures(node):
     if node is TextureRect and node.texture != null:
         if node.texture.get_image() == null or not node.texture.resource_path.begins_with("res://fantasy_kit/art/"):
             return false
+    if node is TextureProgressBar:
+        for texture in [node.texture_under, node.texture_progress, node.texture_over]:
+            if texture != null and (texture.get_image() == null or not texture.resource_path.begins_with("res://fantasy_kit/art/")):
+                return false
     for child in node.get_children():
         if not check_textures(child):
             return false
@@ -503,6 +591,11 @@ func _collect_textures(node: Node, root_node: Node, images: Dictionary) -> void:
 	var path := str(root_node.get_path_to(node))
 	if node is TextureRect and node.texture != null:
 		images[path + "/texture"] = node.texture.get_image().get_data()
+	if node is TextureProgressBar:
+		for property in ["texture_under", "texture_progress", "texture_over"]:
+			var texture: Texture2D = node.get(property)
+			if texture != null:
+				images[path + "/" + property] = texture.get_image().get_data()
 	if node is Control:
 		var styles: Array[String] = []
 		if node is Button:

@@ -37,14 +37,16 @@ project rather than a ready-to-run Windows executable.
 ## Create a fantasy UI kit
 
 1. At the top of **Design Brief**, choose **Fantasy UI kit**.
-2. Choose **Illustrated fantasy** or **Medieval pixel** and a **Design language**:
-   **Royal court**, **Wildwood**, **Runic forge**, **Astral order**, or **Surprise me**.
-   Choose **Wood**, **Stone**, or **Parchment** and a decoration level:
-   **Simple**, **Balanced**, or **Rich**.
-3. Choose a target resolution and click **Generate complete kit**. Leave
-   **Keep seed** unchecked to get a new seed and a different composition each
-   time. Enter a **Design seed** to turn **Keep seed** on and reproduce that starting
-   design with the same brief.
+2. Leave **Surprise everything** on, choose a target resolution, and click
+   **Generate complete kit**. It rolls the art style, theme, material, map shape,
+   resource form, and layout together, using rich decoration.
+3. For manual choices, uncheck **Surprise everything**. Choose **Illustrated
+   fantasy**, **Medieval pixel**, or **Sculpted fantasy**, a design language,
+   material, decoration level, **Map shape**, and **Resource form**.
+   These pickers are hidden while surprise is on; a summary shows its result.
+   Keep **Keep seed** off to explore fresh designs, or enter a **Design seed**
+   to keep and reproduce a starting design. With **Surprise everything** on,
+   the kept seed also reproduces the rolled brief.
 4. Use the **Menu**, **HUD**, and **Components** cards to explore your matching kit.
    Change the accent color, drag pieces, or resize them with their corner handles.
 5. Select a piece in the large preview and click **Regenerate selected** on the
@@ -60,17 +62,19 @@ PNGs, `preset.json`, and integration instructions. Buttons include normal,
 hover, pressed, disabled, and focus artwork. Labels and bars remain native
 editable controls; connect menu actions and sample values to your game code.
 
-![Illustrated fantasy and medieval pixel kits](docs/fantasy-kits.png)
+![Fantasy UI kits](docs/fantasy-kits.png)
 
-The offline generator builds a shared design recipe for the kit: frame
-silhouettes, corners, motifs, icons, and bar fills vary together. Complete
-generation also chooses between four menu/HUD compositions with seeded panel
-proportions, spacing, and placement. This creates coordinated alternatives while keeping
-all three pages part of one matching kit.
+The offline generator combines **bundled original vector ornaments** with
+seeded drawing and assembly. Griffin, stag, golem, celestial, dragon, wolf,
+raven, sun, skull, and kraken motifs coordinate frames, corners, icons, and
+resource displays. Larger maps can use circle, hexagon, shield, octagon,
+diamond, or square windows; health/mana can use bars, orbs, vials, or segments.
+Four menu/HUD compositions also vary panel proportions, spacing, and placement.
+All three pages remain part of one matching kit.
 Keeping a seed reproduces the initial kit; export to preserve your mouse edits,
 individual regenerations, or accepted AI artwork.
 
-![Offline design languages in both art styles](docs/procedural-designs.png)
+![Offline design languages and artwork](docs/procedural-designs.png)
 
 Built-in artwork runs locally and needs no separate model or ComfyUI. For
 **prompt-generated images**, open **Local AI Art → Open AI studio** on the right
@@ -114,10 +118,12 @@ The exported scene keeps your custom element positions and individual scales.
 
 ## What this version provides
 
-- A complete fantasy kit in two separate art styles, with matching Menu, HUD,
+- A complete fantasy kit in three art styles, with matching Menu, HUD,
   and Components pages and regeneration of individual pieces.
-- Four design languages, **Surprise me**, seeded frame/icon/fill variations,
+- Ten design languages with bundled original vector motifs, seeded assembly,
   and four menu/HUD compositions with different grouping and placement.
+- **Surprise everything** for a fresh complete brief, or manual choices with a
+  repeatable seed; six map-window shapes and four health/mana forms.
 - Three kit materials and three decoration levels, with procedural icons,
   button states, framed panels, health/mana bars, and inventory/ability samples.
 - Optional local ComfyUI/SDXL prompt-to-art generation for fantasy kits, with
@@ -136,7 +142,8 @@ The exported scene keeps your custom element positions and individual scales.
 
 Generation uses local templates. Menus, maps, ammo, timers, inventory, and ability
 slots use example data; connect them to your game logic. The preview background
-is not included in exports. Built-in artwork runs procedurally on your PC;
+is not included in exports. Built-in artwork combines original bundled vector
+parts with procedural drawing on your PC;
 optional AI artwork runs through a separately installed local ComfyUI model.
 Neither route requires a provider key. Exported games need only their generated
 scenes, theme, and images.

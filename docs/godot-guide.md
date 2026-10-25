@@ -155,22 +155,26 @@ the test scene; F5 may ask you to select it as the main scene.
 
 ### 1. Generate and export the kit
 
-In UI Forge, select **Fantasy UI kit** at the top of **Design Brief**. Choose
-**Illustrated fantasy** or **Medieval pixel**, a **Design language** (Royal court,
-Wildwood, Runic forge, Astral order, or Surprise me), a material, and decoration
-level, then click **Generate complete kit**. Arrange components on the **Menu**,
+In UI Forge, select **Fantasy UI kit** at the top of **Design Brief**. Leave
+**Surprise everything** on and click **Generate complete kit** to roll a complete
+brief. For manual choices, uncheck it and choose **Illustrated fantasy**,
+**Medieval pixel**, or **Sculpted fantasy**, a design language, material,
+decoration, map shape, and resource form. See the
+[Windows kit guide](windows-guide.md#choose-your-own-look-and-shapes) for the
+ten themes and shape choices. Arrange components on the **Menu**,
 **HUD**, and **Components** pages. Select a piece and use **Regenerate selected**
 to change only its artwork; **Ctrl+Z** restores the previous version.
 
-The offline generator coordinates silhouettes, corners, motifs, icons, and bar
-fills through a shared design recipe. It also selects among four menu/HUD
-compositions. Native component names and the export structure stay consistent,
+The offline generator assembles original bundled vector ornaments with seeded
+frames, surfaces, icons, map windows, and resource displays. It also selects
+among four menu/HUD compositions. Native component names and the export structure stay consistent,
 so the integration paths below apply across these designs. Generating another
 complete kit replaces your current arrangement; export work you want to keep.
 Leave **Keep seed** unchecked for fresh results. Entering a **Design seed** checks
 **Keep seed** automatically; the same seed and brief reproduce the initial
-procedural artwork and layout. Custom mouse edits and individual regenerations
-are preserved through export, rather than by the base seed.
+artwork and layout. With **Surprise everything** on, the seed also reproduces
+the rolled style, theme, material, and shape choices. Custom mouse edits and
+individual regenerations are preserved through export, rather than by the base seed.
 
 For prompt-generated images, follow the
 [local AI setup guide](local-ai-guide.md), then use **Local AI Art → Open AI
@@ -269,13 +273,14 @@ behavior, or a quest system.
 | --- | --- |
 | Panel or banner | **Theme Overrides → Styles → Panel**, a StyleBoxTexture |
 | Button | **Theme Overrides → Styles**, with normal/hover/pressed/disabled/focus StyleBoxTexture resources |
-| Health or mana ProgressBar | **Theme Overrides → Styles → Background / Fill** |
+| ProgressBar resource display | **Theme Overrides → Styles → Background / Fill** |
+| TextureProgressBar resource display | Its **Textures** and **Fill Mode** properties; the value remains a native Range value |
 | Icon | A TextureRect's **Texture** property |
 
 Expand a StyleBoxTexture to inspect or replace its texture. Keep every PNG in
 `art/`: some are only shown during button interaction. Changing a PNG outside
 Godot updates the controls that reference it after reimport. Labels, button
-text, and ProgressBar values stay editable independently of the artwork.
+text, and resource values stay editable independently of the artwork.
 This applies to procedural and AI-generated exports. AI images retain the
 colors produced by the model; adjust the prompt and regenerate in UI Forge,
 or edit the exported image, to change that palette. Review image edges and
@@ -287,6 +292,11 @@ can make pixels uneven; use whole-number viewport scaling when a strict pixel
 grid is important for your game. The selected target resolution is recorded in
 the export; it does not change your game's Project Settings.
 
+The kit minimap's **Minimap/MapContent** is a textured clipping mask matching
+the selected map shape. To replace the sample map, put your map display beneath
+that node and keep its mask texture and **Clip Children** setting. Replacing
+the whole mask with a rectangular map would remove the shaped clipping.
+
 `preset.json` records the design language, settings, seed information, positions,
 and scales. The exported PNGs preserve accepted AI artwork. Importing the preset back
 into UI Forge is not implemented. Export before generating a new kit or closing
@@ -295,8 +305,11 @@ your Godot scene edits.
 
 ## Connect a health bar and test it
 
-Your game must update both the ProgressBar and its number Label. This example
-starts at 100 health, removes 10 when you press Space, and restores health with R.
+Your game must update both **Health/Value** and its number Label. The value
+control is a ProgressBar or TextureProgressBar depending on the generated form;
+both inherit Godot's **Range** class and support `value` and `max_value`.
+This example starts at 100 health, removes 10 when you press Space, and restores
+health with R.
 It works with `hud.tscn` from either a HUD layout export or a fantasy kit export.
 
 ### 1. Attach a script
@@ -312,7 +325,7 @@ It works with `hud.tscn` from either a HUD layout export or a fantasy kit export
 ```gdscript
 extends Node2D
 
-@onready var health_bar: ProgressBar = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Value
+@onready var health_bar: Range = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Value
 @onready var health_text: Label = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Amount
 
 var maximum_health: float = 100.0
@@ -382,8 +395,8 @@ HUD
 | Change shared styling | Select `Elements`, find **Theme**, and edit `hud_theme.tres`. Changes affect controls using the resource. |
 | Style one control | Use its **Theme Overrides**. Some labels and mana/armor fills already have overrides. |
 | Move a component | Edit its Control position in the exported `hud.tscn`, or override the child in your game scene. |
-| Update health or mana | Set its ProgressBar's `value`/`max_value` and update its `Amount` Label. |
-| Make a real minimap | Replace sample nodes in `Minimap/MapContent` with your map or camera-driven UI. |
+| Update health or mana | Set its `Value` control's `value`/`max_value` and update its `Amount` Label. Use `Range` in typed scripts to support ProgressBar and TextureProgressBar forms. |
+| Make a real minimap | Replace sample children in `Minimap/MapContent` with your map or camera-driven UI. For a shaped kit map, keep MapContent's mask texture and clipping setting. |
 | Replace a generated material/frame | Select the component's `Art` TextureRect and change **Texture**, or edit its PNG under the export's `art/` folder. The surface and frame are composited in one PNG; labels and bars stay separate. |
 | Change material opacity | Select its `Art` TextureRect and change **Modulate** alpha under CanvasItem visibility. |
 
@@ -422,6 +435,7 @@ already customized in Godot.
 | Health stays at the sample value | Attach the script to the active test scene, run it with F6, and click the game view before pressing Space. |
 | The bar moves but the number does not | Update both `Health/Value` and `Health/Amount`. |
 | Node2D script incompatibility | Use the Node2D test scene, or change `extends` to match your actual root type. |
+| A TextureProgressBar cannot be assigned to a ProgressBar variable | Type the `Health/Value` or `Mana/Value` variable as `Range` so it works with bars, orbs, and vials. |
 | No background in the exported HUD | The HUD is transparent. Add it to your game scene to see the game behind it. |
 | A theme edit has no effect on an element | Inspect that control's Theme Overrides. |
 | A kit button has no game action | Connect its native `pressed` signal to a script in your game. The exported scenes include styling and sample text, not menu/gameplay logic. |
@@ -454,6 +468,9 @@ in Godot's 2D editor before running it.
 | Fantasy kit procedural shapes, surfaces, ornaments, and icons | `scripts/kit_art.gd` |
 | Detailed procedural frame silhouettes and ornaments | `scripts/kit_frame_art.gd` |
 | Procedural icon shapes and variations | `scripts/kit_icon_art.gd` |
+| Map-window masks and resource-reservoir geometry | `scripts/kit_shapes.gd` |
+| Assembly and styling of bundled vector motifs | `scripts/kit_motif_art.gd` |
+| Original vector ornament drawings | `assets/ornaments/` |
 | Local ComfyUI connection, model discovery, and image requests | `scripts/comfy_client.gd` |
 | Local AI batch generation and progress | `scripts/ai_pipeline.gd` |
 | AI artwork preparation and integration | `scripts/ai_art.gd` |

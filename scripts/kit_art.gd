@@ -7,8 +7,10 @@ const AIArt = preload("res://scripts/ai_art.gd")
 const Design = preload("res://scripts/kit_design.gd")
 const Frames = preload("res://scripts/kit_frame_art.gd")
 const Icons = preload("res://scripts/kit_icon_art.gd")
+const Motifs = preload("res://scripts/kit_motif_art.gd")
+const Shapes = preload("res://scripts/kit_shapes.gd")
 
-const STYLES = ["Illustrated fantasy", "Medieval pixel"]
+const STYLES = ["Illustrated fantasy", "Medieval pixel", "Sculpted fantasy"]
 const MATERIALS = ["Wood", "Stone", "Parchment"]
 const ORNAMENTS = ["Simple", "Balanced", "Rich"]
 static var texture_cache: Dictionary = {}
@@ -16,8 +18,12 @@ static var pixel_color_cache: Dictionary = {}
 static var pixel_cache_accent: String = ""
 
 static func texture(config: Dictionary, dimensions: Vector2, component: String, kind: String = "panel", state: String = "normal") -> ImageTexture:
-	var accepted_art: ImageTexture = AIArt.texture(config, dimensions, component, kind, state)
+	var recipe: Dictionary = Design.recipe(config, component, kind)
+	var role: String = art_role(kind)
+	var accepted_art: ImageTexture = AIArt.texture(config, dimensions, component, role, state)
 	if accepted_art != null:
+		if kind in ["map_frame", "stat_frame", "reservoir_health", "reservoir_mana", "reservoir_empty"]:
+			return _adapt_accepted(accepted_art, dimensions, component, kind, recipe, state)
 		return accepted_art
 	var kit: Dictionary = config.get("kit", {})
 	var material: String = str(kit.get("material", "Wood"))
@@ -26,7 +32,6 @@ static func texture(config: Dictionary, dimensions: Vector2, component: String, 
 	var style: String = str(config.get("style", STYLES[0]))
 	var accent: String = str(config.get("accent", "dcb461")).trim_prefix("#")
 	var decorations: String = str(kit.get("ornaments", "Balanced"))
-	var recipe: Dictionary = Design.recipe(config, component, kind)
 	var seed_value: int = int(recipe.component_seed)
 	var width: int = maxi(1, roundi(dimensions.x))
 	var height: int = maxi(1, roundi(dimensions.y))
@@ -42,16 +47,78 @@ static func texture(config: Dictionary, dimensions: Vector2, component: String, 
 	var image := Image.new()
 	if image.load_svg_from_string(svg) != OK:
 		return null
+	Motifs.compose(image, dimensions, kind, recipe, decorations, state)
+	_apply_role_mask(image, dimensions, kind, recipe)
 	if pixel:
 		_pixelize(image, width, height, material, accent, kind, recipe)
 	var result := ImageTexture.create_from_image(image)
-	result.set_meta("kit_art_role", kind)
+	result.set_meta("kit_art_role", role)
+	result.set_meta("kit_art_kind", kind)
 	result.set_meta("kit_art_component", component)
 	result.set_meta("kit_art_source", "procedural")
 	result.set_meta("kit_art_family", recipe.family)
 	result.set_meta("kit_art_silhouette", recipe.silhouette)
+	result.set_meta("kit_art_motif", recipe.get("motif", "griffin"))
+	result.set_meta("kit_art_rendering", recipe.get("rendering", "painted"))
 	texture_cache[key] = result
 	return result
+
+static func art_role(kind: String) -> String:
+	return {"map_frame": "panel", "stat_frame": "panel", "reservoir_empty": "bar_frame", "reservoir_health": "fill_health", "reservoir_mana": "fill_mana"}.get(kind, kind)
+
+static func _adapt_accepted(source: ImageTexture, dimensions: Vector2, component: String, kind: String, recipe: Dictionary, state: String) -> ImageTexture:
+	var key: String = JSON.stringify(["accepted", source.get_instance_id(), dimensions, component, kind, recipe, state])
+	if texture_cache.has(key):
+		return texture_cache[key]
+	if texture_cache.size() >= 384:
+		texture_cache.clear()
+	var image: Image = source.get_image()
+	_apply_role_mask(image, dimensions, kind, recipe, true)
+	var result := ImageTexture.create_from_image(image)
+	for meta in source.get_meta_list():
+		result.set_meta(meta, source.get_meta(meta))
+	result.set_meta("kit_art_role", art_role(kind))
+	result.set_meta("kit_art_kind", kind)
+	texture_cache[key] = result
+	return result
+
+static func _apply_role_mask(image: Image, dimensions: Vector2, kind: String, recipe: Dictionary, accepted: bool = false) -> void:
+	var shape: String
+	var rect: Rect2
+	var outside: bool = false
+	if kind == "map_frame":
+		shape = str(recipe.get("map_shape", "circle"))
+		rect = Shapes.map_rect(dimensions)
+		if accepted:
+			# An accepted panel image becomes a shaped ring too; its original
+			# rectangular canvas must not reintroduce a slab around the minimap.
+			var exterior: String = Shapes.path(shape, rect.grow(15))
+			var footer: String = Shapes.path("square", Rect2(20, dimensions.y - 35, dimensions.x - 40, 30))
+			_alpha_mask(image, dimensions, exterior + " " + footer, true)
+	elif kind == "stat_frame":
+		shape = str(recipe.get("stat_presentation", "orb"))
+		rect = Shapes.stat_geometry(dimensions, shape).reservoir
+	elif kind in ["reservoir_empty", "reservoir_health", "reservoir_mana"]:
+		shape = str(recipe.get("stat_presentation", "orb"))
+		rect = Rect2(1, 1, dimensions.x - 2, dimensions.y - 2)
+		outside = true
+	else:
+		return
+	_alpha_mask(image, dimensions, Shapes.path(shape, rect), outside)
+
+static func _alpha_mask(image: Image, dimensions: Vector2, path: String, inside: bool) -> void:
+	var mask := Image.new()
+	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %s %s"><path d="%s" fill="white"/></svg>' % [image.get_width(), image.get_height(), dimensions.x, dimensions.y, path]
+	if mask.load_svg_from_string(svg) != OK:
+		return
+	image.convert(Image.FORMAT_RGBA8)
+	mask.convert(Image.FORMAT_RGBA8)
+	var bytes: PackedByteArray = image.get_data()
+	var mask_bytes: PackedByteArray = mask.get_data()
+	for offset in range(3, bytes.size(), 4):
+		var alpha: int = int(mask_bytes[offset]) if inside else 255 - int(mask_bytes[offset])
+		bytes[offset] = int(bytes[offset]) * alpha / 255
+	image.set_data(image.get_width(), image.get_height(), false, Image.FORMAT_RGBA8, bytes)
 
 static func _svg(w: int, h: int, material: String, ornaments: String, accent: String, kind: String, state: String, rng: RandomNumberGenerator, pixel: bool, recipe: Dictionary = {}) -> String:
 	# SVG only describes local vector geometry; it never refers to external files.
@@ -63,13 +130,20 @@ static func _svg(w: int, h: int, material: String, ornaments: String, accent: St
 	var gold: String = "#" + Color(accent).to_html(false)
 	var light: String = "#" + Color(accent).lightened(.4).to_html(false)
 	var dark: String = "#" + Color(accent).darkened(.6).to_html(false)
-	parts.append('<defs><linearGradient id="gold" x2="0" y2="1"><stop stop-color="%s"/><stop offset=".26" stop-color="%s"/><stop offset=".52" stop-color="%s"/><stop offset=".76" stop-color="%s"/><stop offset="1" stop-color="%s"/></linearGradient>' % [light, gold, dark, gold, dark])
+	var sculpted: bool = str(recipe.get("rendering", "painted")) == "sculpted"
+	parts.append('<defs><linearGradient id="gold" x2="0" y2="1"><stop stop-color="%s"/><stop offset=".13" stop-color="%s"/><stop offset=".26" stop-color="%s"/><stop offset=".52" stop-color="%s"/><stop offset=".76" stop-color="%s"/><stop offset="1" stop-color="%s"/></linearGradient>' % [light, "#fff8da" if sculpted else light, gold, dark, gold, dark])
 	parts.append('<linearGradient id="face" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#%s"/><stop offset=".48" stop-color="#%s"/><stop offset="1" stop-color="#%s"/></linearGradient>' % colors)
 	parts.append('<linearGradient id="steel" x2="1" y2=".2"><stop stop-color="#465965"/><stop offset=".42" stop-color="#d9e5df"/><stop offset=".52" stop-color="#f7f3dc"/><stop offset=".56" stop-color="#80938d"/><stop offset="1" stop-color="#354751"/></linearGradient>')
 	parts.append('<linearGradient id="red" x2="0" y2="1"><stop stop-color="#ffb187"/><stop offset=".25" stop-color="#d34f46"/><stop offset=".6" stop-color="#9b2637"/><stop offset="1" stop-color="#471c2c"/></linearGradient>')
 	parts.append('<linearGradient id="blue" x2="0" y2="1"><stop stop-color="#b6f4f2"/><stop offset=".25" stop-color="#5fbbd6"/><stop offset=".6" stop-color="#2d659f"/><stop offset="1" stop-color="#233055"/></linearGradient></defs>')
 	if kind.begins_with("icon_"):
 		Icons.draw(parts, w, h, kind.trim_prefix("icon_"), gold, light, dark, rng, recipe)
+	elif kind == "map_frame":
+		_map_frame(parts, Vector2(w, h), recipe, gold, light, dark, ornaments)
+	elif kind == "stat_frame":
+		_stat_frame(parts, Vector2(w, h), recipe, gold, light, dark, ornaments)
+	elif kind in ["reservoir_empty", "reservoir_health", "reservoir_mana"]:
+		_reservoir(parts, w, h, kind, recipe)
 	elif kind in ["fill_health", "fill_mana"]:
 		Frames.fill(parts, w, h, kind, recipe, rng)
 	else:
@@ -112,6 +186,15 @@ static func _surface_colors(material: String, recipe: Dictionary) -> Array[Strin
 	return result
 
 static func _frame(parts: Array[String], w: int, h: int, material: String, ornaments: String, gold: String, light: String, dark: String, kind: String, state: String, rng: RandomNumberGenerator, recipe: Dictionary) -> void:
+	var full_height: int = h
+	var top: int = roundi(Motifs.header_height(Vector2(w, h), kind) * .36)
+	var bottom: int = 0
+	if kind in ["button", "banner"]:
+		top = roundi(minf(h * .12, 12))
+		bottom = top
+	if top > 0:
+		parts.append('<g transform="translate(0 %d)">' % top)
+		h -= top + bottom
 	var trim: float = minf(minf(w, h) * .14, 11.0)
 	if kind in ["button", "banner"]:
 		trim = minf(trim, 7.0)
@@ -143,6 +226,53 @@ static func _frame(parts: Array[String], w: int, h: int, material: String, ornam
 	Frames.decorate(parts, w, h, trim, recipe, gold, light, dark, kind, ornaments)
 	if state == "focus":
 		parts.append('<path d="%s" fill="none" stroke="%s" stroke-width="2.2"/>' % [edge, light])
+	if top > 0:
+		parts.append('</g>')
+	Motifs.assembly(parts, Vector2(w, full_height), kind, recipe, ornaments, gold, light, dark)
+
+static func _map_frame(parts: Array[String], dimensions: Vector2, recipe: Dictionary, gold: String, light: String, dark: String, ornaments: String) -> void:
+	var rect: Rect2 = Shapes.map_rect(dimensions)
+	var shape: String = str(recipe.get("map_shape", "circle"))
+	var aperture: String = Shapes.path(shape, rect)
+	var exterior: String = Shapes.path(shape, rect.grow(14))
+	parts.append('<path d="%s %s" fill="url(#face)" fill-rule="evenodd" stroke="%s" stroke-width="4"/>' % [exterior, aperture, dark])
+	parts.append('<path d="%s" fill="none" stroke="url(#gold)" stroke-width="13"/><path d="%s" fill="none" stroke="%s" stroke-width="1.2"/>' % [Shapes.path(shape, rect.grow(7)), Shapes.path(shape, rect.grow(13)), light])
+	parts.append('<path d="%s" fill="none" stroke="%s" stroke-width="2"/>' % [aperture, dark])
+	var footer: String = Shapes.path("square", Rect2(20, dimensions.y - 35, dimensions.x - 40, 30))
+	parts.append('<path d="%s" fill="url(#face)" stroke="%s" stroke-width="3"/><path d="%s" fill="none" stroke="url(#gold)" stroke-width="1.2"/>' % [footer, dark, footer])
+	for side in [-1, 1]:
+		parts.append('<path d="M %s 45 Q %s 33 %s %s" fill="none" stroke="%s" stroke-width="9"/><path d="M %s 45 Q %s 33 %s %s" fill="none" stroke="url(#gold)" stroke-width="5"/>' % [dimensions.x * .5 + side * 35, dimensions.x * .5 + side * 105, rect.get_center().x + side * rect.size.x * .48, rect.position.y + rect.size.y * .33, dark, dimensions.x * .5 + side * 35, dimensions.x * .5 + side * 105, rect.get_center().x + side * rect.size.x * .48, rect.position.y + rect.size.y * .33])
+	if ornaments != "Simple":
+		for i in range(8 if ornaments == "Rich" else 4):
+			var angle: float = i * TAU / (8 if ornaments == "Rich" else 4) + .15
+			var at: Vector2 = rect.get_center() + Vector2(cos(angle), sin(angle)) * (rect.size.x * .5 + 10)
+			parts.append('<circle cx="%s" cy="%s" r="3" fill="url(#gold)" stroke="%s"/><circle cx="%s" cy="%s" r="1" fill="%s"/>' % [at.x, at.y, dark, at.x - .6, at.y - .6, light])
+
+static func _stat_frame(parts: Array[String], dimensions: Vector2, recipe: Dictionary, gold: String, light: String, dark: String, ornaments: String) -> void:
+	var presentation: String = str(recipe.get("stat_presentation", "orb"))
+	var geometry: Dictionary = Shapes.stat_geometry(dimensions, presentation)
+	var reservoir: Rect2 = geometry.reservoir
+	var plaque: Rect2 = geometry.plaque
+	var rim: String = Shapes.path(presentation, reservoir.grow(8))
+	parts.append('<path d="%s" fill="url(#face)" stroke="%s" stroke-width="4"/><path d="%s" fill="none" stroke="url(#gold)" stroke-width="7"/><path d="%s" fill="none" stroke="%s" stroke-width="1.2"/>' % [rim, dark, rim, Shapes.path(presentation, reservoir.grow(12)), light])
+	var board: String = Frames.shape(plaque.position.x - 8, plaque.position.y, plaque.size.x + 26, plaque.size.y, 13, recipe, "panel")
+	parts.append('<path d="%s" fill="url(#face)" stroke="%s" stroke-width="7"/><path d="%s" fill="none" stroke="url(#gold)" stroke-width="3.5"/>' % [board, dark, board])
+	if ornaments != "Simple":
+		for side in [-1, 1]:
+			var cy: float = reservoir.get_center().y
+			parts.append('<path d="M %s %s Q %s %s %s %s" fill="none" stroke="%s" stroke-width="8"/><path d="M %s %s Q %s %s %s %s" fill="none" stroke="url(#gold)" stroke-width="4"/>' % [reservoir.position.x + reservoir.size.x * .3, cy + side * reservoir.size.y * .5, reservoir.position.x - 12, cy + side * reservoir.size.y * .52, reservoir.position.x - 4, cy, dark, reservoir.position.x + reservoir.size.x * .3, cy + side * reservoir.size.y * .5, reservoir.position.x - 12, cy + side * reservoir.size.y * .52, reservoir.position.x - 4, cy])
+
+static func _reservoir(parts: Array[String], w: int, h: int, kind: String, recipe: Dictionary) -> void:
+	var presentation: String = str(recipe.get("stat_presentation", "orb"))
+	var path: String = Shapes.path(presentation, Rect2(1, 1, w - 2, h - 2))
+	var fill: String = "url(#red)" if kind == "reservoir_health" else "url(#blue)"
+	if kind == "reservoir_empty":
+		fill = "#101d2b"
+	parts.append('<path d="%s" fill="%s" stroke="#b7d4d2" stroke-width="1.4" stroke-opacity=".6"/><defs><clipPath id="reservoir"><path d="%s"/></clipPath></defs><g clip-path="url(#reservoir)">' % [path, fill, path])
+	if kind != "reservoir_empty":
+		for i in range(4):
+			parts.append('<path d="M -4 %s Q %s %s %s %s T %s %s" fill="none" stroke="#effff5" stroke-width="%s" opacity=".14"/>' % [h * (.2 + i * .2), w * .23, h * (.05 + i * .2), w * .5, h * (.2 + i * .2), w + 4, h * (.2 + i * .2), 1.5 + i * .5])
+	parts.append('<ellipse cx="%s" cy="%s" rx="%s" ry="%s" fill="#e6fff2" opacity=".15"/><path d="M %s %s Q %s %s %s %s" fill="none" stroke="#f1fff1" stroke-width="%s" opacity=".65"/></g>' % [w * .31, h * .3, w * .12, h * .23, w * .2, h * .24, w * .13, h * .48, w * .2, h * .62, maxf(1.5, w * .025)])
 
 static func _surface(parts: Array[String], w: int, h: int, trim: float, material: String, rng: RandomNumberGenerator, recipe: Dictionary = {}) -> void:
 	var x0: float = trim + 1

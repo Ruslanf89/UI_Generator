@@ -61,15 +61,21 @@ customizations after generating. Export always uses the visible design.
 
 CREATE A COMPLETE FANTASY KIT
 1. In the Design Brief dropdown, choose Fantasy UI kit.
-2. Choose Illustrated fantasy or Medieval pixel. Under Design Language, choose
-   Royal court, Wildwood, Runic forge, Astral order, or Surprise me. Then choose
-   a material and decoration amount. The language coordinates shapes and ornaments.
+2. Leave Surprise everything checked to explore a complete matching brief.
+   The seed chooses the art style, design language, material, motif, map/stat
+   shapes, and composition. A summary shows the generated choices afterward.
+   Turn Surprise everything off to make manual choices. Art styles include
+   Illustrated fantasy, Medieval pixel, and Sculpted fantasy. Design languages
+   include Royal court, Wildwood, Runic forge, and Astral order.
 3. Click Generate complete kit. Menu, HUD, and Components are matching pages.
-   With Keep seed unchecked, each generation uses a fresh Design Seed for new
-   frame shapes, ornaments, icons, colors, and a different menu/HUD composition.
+   With Keep seed unchecked, each generation uses a fresh Design Seed. Shapes
+   include circle, hexagon, shield, octagon, diamond, and square minimaps, plus
+   bar, orb, and vial stat displays. Motifs include original creatures, crests,
+   and celestial ornaments; each kit keeps a coordinated look.
 4. To repeat a design, enable Keep seed. Entering a Design Seed enables Keep seed
-   automatically. Use the same style, design language, material, and decoration
-   settings to reproduce it. Uncheck Keep seed to explore another design.
+   automatically. Keep seed with Surprise everything repeats the complete brief.
+   With manual choices, keep the same settings and seed to reproduce the design.
+   Uncheck Keep seed to explore another design.
 5. Select a piece in the large preview and click Regenerate selected on the right
    to change only its artwork. Positions, sizes, and other pieces are kept.
    Ctrl+Z undoes regeneration. Accent color applies across the kit.
@@ -79,7 +85,9 @@ CREATE A COMPLETE FANTASY KIT
    Buttons have hover/pressed/disabled/focus states; connect actions in your game.
 Generate complete kit replaces the current kit and resets custom positions and
 sizes. Export first to keep a version; use Regenerate selected for a local change.
-The procedural mode works offline without an account or API key.
+The offline generator assembles original bundled vector ornament parts with
+seeded procedural frames, materials, and layouts. It works without an account,
+API key, or artwork downloads. The built-in artwork is vector-based.
 
 GENERATE NEW ARTWORK FROM A PROMPT (LOCAL AI)
 1. Follow docs/local-ai-guide.md to install the current official NVIDIA ComfyUI
@@ -106,6 +114,8 @@ EXPORT AND USE IN GODOT
 4. Keep all four output files together: hud.tscn, hud_theme.tres, preset.json,
    and README.md. If an art folder is present, copy it too. Repeated exports
    create separate folders. The scene keeps component positions and scales.
+   Fantasy kits include all three scenes and kit_theme.tres instead; keep their
+   art folder as well. Shaped minimaps and orb/vial fills need those PNGs.
 5. Open your game's Godot 4.6+ project. Copy the whole exported folder into it.
 6. Add a CanvasLayer under the game scene's root. Drag hud.tscn onto it.
 7. Save and run the game scene. Connect the controls to your gameplay values.
@@ -123,9 +133,11 @@ KEEP YOUR WORK
 Designs are held in memory. Export before closing the app or clicking New UI.
 Loading exported presets back into UI Forge is not implemented. Generated
 controls can be edited directly in Godot. Maps, ammo, timers, and ability slots
-use example data; your game supplies behavior. Offline kits use seeded design
-rules for shapes, icons, and compositions; optional local AI creates artwork
-from your prompt.
+use example data; your game supplies behavior. Offline kits combine original
+vector parts with seeded styling and composition; optional local AI creates
+artwork from your prompt. Health/Value and Mana/Value keep the native Range
+value/max_value API for bars, orbs, and vials; exported games need no generator
+script or artwork service.
 
 This development package uses the full official Godot 4.6.3 Windows engine.
 The engine archive was verified against the published SHA-512 checksum.

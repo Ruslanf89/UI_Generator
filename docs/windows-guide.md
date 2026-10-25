@@ -72,7 +72,7 @@ extracted folder. Keep the whole app folder together when moving it.
 | Area | What it controls |
 | --- | --- |
 | Mode dropdown at the top of **Design Brief** | Choose **HUD layouts** or **Fantasy UI kit** |
-| **Design Brief**, on the left | HUD game type/style/components, or kit art style/design language/material/decoration/seed; target resolution and Generate |
+| **Design Brief**, on the left | HUD choices, or kit surprise/manual controls, map/resource shapes, and seed; target resolution and Generate |
 | Large central preview | The selected layout or kit page over an illustrative background; select, move, and resize pieces here |
 | Three thumbnails below the preview | HUD layout options, or the kit's Menu, HUD, and Components pages |
 | **The Finishing Touches**, on the right | Accent color, HUD size, and example health/mana values |
@@ -203,60 +203,103 @@ matching shapes, materials, colors, and ornaments.
 1. Export any current work you want to keep.
 2. At the top of the left **Design Brief** panel, change **HUD layouts** to
    **Fantasy UI kit**.
-3. Under **Art Style**, choose **Illustrated fantasy** for smooth carved frames
-   and layered ornaments, or **Medieval pixel** for blocky pixel artwork.
-4. Under **Design language**, choose **Royal court**, **Wildwood**, **Runic
-   forge**, or **Astral order**. Choose **Surprise me** to let generation choose
-   a language for you. The language coordinates the shapes and decorative motifs
-   used throughout the kit.
-5. Under **Material**, choose **Wood**, **Stone**, or **Parchment**.
-6. Under **Decoration**, choose **Simple**, **Balanced**, or **Rich**. This
-   controls the amount of trim and ornamentation.
-7. Leave **Keep seed** unchecked to explore new results. Choose **Target
-   Resolution**, then click **Generate complete kit**.
-8. Click **Menu**, **HUD**, and **Components** below the previews to inspect
+3. Leave **Surprise everything** checked. This is the default. Choose **Target
+   Resolution** and leave **Keep seed** unchecked for fresh results.
+4. Click **Generate complete kit**. The seed chooses an art style, design
+   language, material, layout, map shape, and resource form, with **Rich**
+   decoration. A compact summary shows the rolled result.
+5. Click **Menu**, **HUD**, and **Components** below the previews to inspect
    the three pages. These are parts of one kit, rather than alternative layouts.
 
-![The two fantasy kit art styles](fantasy-kits.png)
+![Fantasy kits with coordinated artwork](fantasy-kits.png)
 
 | Page | Included examples |
 | --- | --- |
 | **Menu** | Title banner, menu panel, Continue/New journey/Settings/Exit buttons, character panel, and quest card |
-| **HUD** | Health/mana bars, currency, minimap sample, objective panel, ability buttons, and quest-log button |
+| **HUD** | Health/mana resource displays, currency, shaped minimap sample, objective panel, ability buttons, and quest-log button |
 | **Components** | Framed panel, button-state examples, inventory slots, health/mana bars, and procedural icons |
 
-The kit starts with artwork drawn procedurally on your PC. Both built-in styles
-work offline without a separate model. You can also generate images from a
-prompt using local ComfyUI and SDXL, as described below. The controls and sample
-screens form a starting kit; the app does not create gameplay logic.
+The kit combines original bundled vector drawings with procedural frames,
+surfaces, and assembly. It runs offline without a separate model. You can also
+generate images from a prompt using local ComfyUI and SDXL, as described below.
+The controls and sample screens form a starting kit; the app does not create
+gameplay logic.
+
+### Choose your own look and shapes
+
+Uncheck **Surprise everything** to reveal the manual pickers. While surprise is
+on, those pickers are hidden and the summary shows the current rolled choices.
+After changing manual choices, click **Generate complete kit** to apply them.
+
+| Control | Choices |
+| --- | --- |
+| **Art Style** | **Illustrated fantasy** for layered illustrated shapes, **Medieval pixel** for a crisp pixel grid, or **Sculpted fantasy** for stronger relief and embossed shading |
+| **Design language** | A theme from the table below, or **Surprise me** to select it from the seed |
+| **Material** | **Wood**, **Stone**, or **Parchment** |
+| **Decoration** | **Simple**, **Balanced**, or **Rich** |
+| **Map shape** | **Surprise me**, **Circle**, **Hexagon**, **Shield**, **Octagon**, **Diamond**, or **Square** |
+| **Resource form** | **Surprise me**, **Bar**, **Orb**, **Vial**, or **Segmented** |
+
+The design languages coordinate a set of original vector motifs:
+
+| Design language | Motif |
+| --- | --- |
+| Royal court | Griffin |
+| Wildwood | Stag |
+| Runic forge | Golem |
+| Astral order | Celestial crest |
+| Dragon covenant | Dragon |
+| Moonfang clan | Wolf |
+| Raven court | Raven |
+| Sun temple | Sun |
+| Bone crypt | Skull |
+| Tidal shrine | Kraken |
+
+The app assembles these bundled drawings locally with seeded borders, shading,
+and ornaments. They are original vector parts; no AI service is used for this
+built-in artwork.
+
+Maps now have larger shaped windows. The sample map content is clipped to the
+actual circle, shield, or other chosen outline. Health and mana remain live
+controls in every form: move the **Health**/**Mana** sliders to test bars,
+segmented fills, or filling/emptying orbs and vials. Their exported values can
+be driven by your game code.
 
 ### Explore different offline designs
 
 The generator uses one seeded design recipe to coordinate frame silhouettes,
-corner shapes, ornaments, icons, and health/mana fills. The chosen design
-language guides this recipe across buttons, panels, and HUD pieces. Generation
+corner shapes, vector motifs, icons, map windows, and health/mana displays.
+The chosen design language guides this recipe across buttons, panels, and HUD pieces. Generation
 also selects among four menu/HUD compositions, changing grouping and placement
 as well as the artwork: **Split court**, **Story sidebar**, **Command grid**,
 and **Ribbon hall**. Any design language can use any of these compositions.
 The seed also varies panel proportions, button spacing, and HUD dimensions
 within a composition, so each layout type can produce many different designs.
 
-![The four offline design languages in both art styles](procedural-designs.png)
+![Offline design languages and artwork](procedural-designs.png)
 
 With **Keep seed** unchecked, click **Generate complete kit** to get a fresh
-seed and a different composition from the previous kit. The **Menu**,
+seed. **Surprise everything** can change the whole brief; with it off, your
+manual choices guide the new result. The **Menu**,
 **HUD**, and **Components** cards show pages of that result; they are not three
 alternative complete kits. Use **Regenerate selected** when you want new
 artwork for one piece while keeping the current layout and other artwork.
 
+With **Surprise everything** on and **Keep seed** off, a new generation changes
+the art style, dominant motif, map outline, resource form, and composition from
+the immediately previous kit. In manual mode, explicitly chosen map and
+resource forms stay fixed; **Surprise me** lets the seed choose them.
+
 To reproduce a starting design:
 
-1. Note the **Design seed** shown after generating a kit and keep the same art style,
-   design language, material, decoration, and resolution choices.
+1. Note the **Design seed** shown after generating a kit. Keep **Surprise
+   everything** in the same state. For a manual design, keep the same art style,
+   design language, material, decoration, map shape, resource form, and resolution.
 2. Enter that number under **Design seed**. Editing it automatically checks **Keep seed**.
    You can also tick **Keep seed** to reuse the seed already displayed.
 3. Click **Generate complete kit**. The same seed and brief recreate the same
-   initial procedural artwork and layout. **Surprise me** is repeatable too.
+   initial artwork and layout. **Surprise everything** also reproduces its
+   rolled art style, theme, material, and shapes from that seed.
 4. Uncheck **Keep seed** when you want to explore fresh complete designs again.
 
 Keeping a seed does not keep your custom mouse arrangement or later individual
@@ -292,7 +335,8 @@ Drag pieces and use their corner handles as described above. **Accent Color**,
 choices on the left supply the built-in kit artwork. The accent picker is
 disabled while AI images are active; their colors come from the artwork prompt.
 
-Changing the kit style, design language, material, decoration, or resolution
+Changing the kit style, design language, material, decoration, map shape,
+resource form, or resolution
 marks the brief as pending. **Generate complete kit** applies it by creating a fresh entire kit
 and resetting the current arrangement, color, sizes, and sample values. Export
 first if you want to keep the previous result. **Regenerate selected** is the
@@ -332,7 +376,7 @@ Your current kit remains intact until the requested batch succeeds. **Cancel**
 keeps the accepted kit and stops further submissions; an image already running
 in ComfyUI may still finish. UI Forge does not interrupt other ComfyUI jobs.
 
-The model supplies images; Labels, button text, ProgressBars, and the layout
+The model supplies images; Labels, button text, resource values, and the layout
 stay editable. Matte removal can leave edge defects, and separately generated
 pieces can vary. Adjust the prompt and retry as needed. Avoid magenta subject
 details because the workflow uses a magenta background for removal. AI images
@@ -419,9 +463,10 @@ is not implemented.
 You can keep editing the exported scene and theme directly in Godot.
 
 The menus, minimap, weapon values, timers, inventory, and ability slots contain
-example data. They become functional when connected to your game's code. The central preview
-background is illustrative and is not exported. HUD layouts use local templates;
-fantasy kits combine seeded artwork and composition rules.
+example data. They become functional when connected to your game's code. The
+central preview background is illustrative and is not exported. HUD layouts use
+local templates; fantasy kits combine bundled original vector parts, procedural
+drawing, and seeded composition rules.
 
 ## Troubleshooting
 

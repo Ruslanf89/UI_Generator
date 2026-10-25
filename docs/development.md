@@ -13,6 +13,7 @@ repository root
 godot --headless --editor --path . --import --quit
 godot --headless --path . --script tests/run_tests.gd
 godot --headless --path . --script tests/run_kit_tests.gd
+godot --headless --path . --script tests/run_kit_shape_tests.gd
 godot --headless --path . --script tests/run_ai_tests.gd
 godot --headless --path . --quit-after 6
 ```
@@ -33,12 +34,19 @@ compared with the preview. Generated material PNGs use relative paths and need G
 image import before running a copied scene.
 
 The fantasy kit suite is separate from the original HUD regression suite. Run
-both after changing shared preview or app behavior. It checks the two kit art
+both after changing shared preview or app behavior. It checks the three kit art
 styles, native controls and button states, repeatable procedural artwork,
 individual component regeneration, and portable three-scene exports. Kit
 exports must retain each page's custom transforms and load in a separate game
 project with all PNGs imported. Visual inspection is still needed for text
 readability, ornament placement, and the pixel grid at different window sizes.
+
+The shape suite also exports orbs and vials into independent Godot projects.
+To verify actual minimap clipping and liquid fill rendering with a display, run:
+
+```sh
+godot --path . --rendering-driver opengl3 --audio-driver Dummy --script tests/run_kit_shape_tests.gd -- --render
+```
 
 The local AI suite uses a simulated ComfyUI HTTP server. It exercises connection
 and checkpoint discovery, workflow submission, queued-job polling, image
@@ -82,16 +90,29 @@ one piece does not reroll the rest of the kit.
 
 `scripts/kit_art.gd` delegates detailed frame geometry and ornaments to
 `scripts/kit_frame_art.gd`, and icon drawing to `scripts/kit_icon_art.gd`.
-Keep these helpers coordinated through the shared recipe when adding variants.
+`scripts/kit_motif_art.gd` assembles the original vector drawings bundled under
+`assets/ornaments/` with generated relief, borders, and placement.
+`scripts/kit_shapes.gd` shares map-window masks and resource-reservoir geometry
+between the artwork and native controls. Keep these helpers coordinated through
+the shared recipe when adding variants.
 
-When changing recipe or composition code, check both art styles, all four
-design languages, and all four menu/HUD compositions. Compare a rebuilt seed
-after clearing artwork caches, and verify that an individual reroll leaves
+When changing recipe or composition code, check all three art styles, all ten
+design languages, and all four menu/HUD compositions. Include the six map shapes
+and four resource forms: map children must stay clipped to the actual aperture,
+and every resource form must respond to live Range `value`/`max_value` changes.
+Compare a rebuilt seed after clearing artwork caches, and verify that an individual reroll leaves
 other images and page transforms unchanged. The **Keep seed** workflow should
 reproduce the initial generated design; full generation still clears custom
 arrangements and component overrides.
 
-The default kit remains entirely procedural. Optional prompt generation uses
+**Surprise everything** rolls the complete brief from the seed, while manual
+mode uses the selected art style, language, material, decoration, map shape,
+and resource form. A kept seed must reproduce the surprise brief as well as its
+artwork and layout. Export and standalone-package checks must include the
+bundled vector assets and generated clipping-mask textures.
+
+The default kit combines bundled original artwork with procedural drawing and
+assembly, without model inference. Optional prompt generation uses
 `scripts/comfy_client.gd` for the local ComfyUI API,
 `scripts/ai_pipeline.gd` for coordinated requests, and `scripts/ai_art.gd` for
 artwork preparation and integration. The app does not download models or launch

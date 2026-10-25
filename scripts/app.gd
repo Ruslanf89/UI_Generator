@@ -54,12 +54,18 @@ var creation_picker: OptionButton
 var hud_brief: VBoxContainer
 var kit_brief: VBoxContainer
 var kit_brief_scroll: ScrollContainer
+var kit_surprise: CheckBox
+var kit_manual_controls: VBoxContainer
+var kit_roll_summary: Label
 var kit_style_picker: OptionButton
 var kit_design_picker: OptionButton
 var kit_material_picker: OptionButton
 var kit_ornament_picker: OptionButton
+var kit_map_picker: OptionButton
+var kit_resource_picker: OptionButton
 var kit_seed: SpinBox
 var kit_seed_lock: CheckBox
+var kit_seed_draft = false
 var generate_button: Button
 var art_controls: VBoxContainer
 var kit_controls: VBoxContainer
@@ -81,6 +87,7 @@ var ai_restore_button: Button
 var ai_hint: Label
 var ai_busy = false
 var ai_preferred_checkpoint = ""
+var recent_kit_signatures: Array[String] = []
 
 func _ready() -> void:
 	DisplayServer.window_set_min_size(Vector2i(1120, 900))
@@ -498,31 +505,59 @@ func _sidebar(parent: Node) -> void:
 	kit_brief_scroll.add_child(kit_brief)
 	kit_brief.add_child(_label("A whole world of UI.", 21, INK))
 	kit_brief.add_child(_wrapped("Generate a matching menu, gameplay HUD, and library of reusable controls.", 12, MUTED))
-	kit_brief.add_child(_label("01   ART STYLE", 11, MUTED))
+	kit_surprise = CheckBox.new()
+	kit_surprise.text = "Surprise everything"
+	kit_surprise.button_pressed = true
+	kit_surprise.add_theme_font_size_override("font_size", 13)
+	kit_surprise.tooltip_text = "Generate chooses the art direction, creatures, materials, map contour, resource forms, and composition."
+	kit_surprise.toggled.connect(func(_pressed):
+		_sync_kit_brief_controls()
+		_mark_dirty())
+	kit_brief.add_child(kit_surprise)
+	kit_roll_summary = _wrapped("Generate chooses a creature motif, art direction, map outline, resource form, and layout.", 12, MUTED)
+	kit_brief.add_child(kit_roll_summary)
+	kit_manual_controls = VBoxContainer.new()
+	kit_manual_controls.add_theme_constant_override("separation", 10)
+	kit_brief.add_child(kit_manual_controls)
+	kit_manual_controls.add_child(_label("01   ART STYLE", 11, MUTED))
 	kit_style_picker = OptionButton.new()
 	for style in Kit.STYLES:
 		kit_style_picker.add_item(style)
 	kit_style_picker.item_selected.connect(func(_index): _mark_dirty())
-	kit_brief.add_child(kit_style_picker)
-	kit_brief.add_child(_label("02   DESIGN LANGUAGE", 11, MUTED))
+	kit_manual_controls.add_child(kit_style_picker)
+	kit_manual_controls.add_child(_label("02   DESIGN LANGUAGE", 11, MUTED))
 	kit_design_picker = OptionButton.new()
 	for design in KitDesign.FAMILIES:
 		kit_design_picker.add_item(design)
 	kit_design_picker.item_selected.connect(func(_index): _mark_dirty())
-	kit_brief.add_child(kit_design_picker)
-	kit_brief.add_child(_label("03   MATERIAL", 11, MUTED))
+	kit_manual_controls.add_child(kit_design_picker)
+	kit_manual_controls.add_child(_label("03   MATERIAL", 11, MUTED))
 	kit_material_picker = OptionButton.new()
 	for material in Kit.MATERIALS:
 		kit_material_picker.add_item(material)
 	kit_material_picker.item_selected.connect(func(_index): _mark_dirty())
-	kit_brief.add_child(kit_material_picker)
-	kit_brief.add_child(_label("04   DECORATION", 11, MUTED))
+	kit_manual_controls.add_child(kit_material_picker)
+	kit_manual_controls.add_child(_label("04   DECORATION", 11, MUTED))
 	kit_ornament_picker = OptionButton.new()
 	for amount in Kit.ORNAMENTS:
 		kit_ornament_picker.add_item(amount)
 	kit_ornament_picker.select(2)
 	kit_ornament_picker.item_selected.connect(func(_index): _mark_dirty())
-	kit_brief.add_child(kit_ornament_picker)
+	kit_manual_controls.add_child(kit_ornament_picker)
+	kit_manual_controls.add_child(_label("05   MAP SHAPE", 11, MUTED))
+	kit_map_picker = OptionButton.new()
+	kit_map_picker.add_item("Surprise me")
+	for shape in KitDesign.MAP_SHAPES:
+		kit_map_picker.add_item(str(shape).capitalize())
+	kit_map_picker.item_selected.connect(func(_index): _mark_dirty())
+	kit_manual_controls.add_child(kit_map_picker)
+	kit_manual_controls.add_child(_label("06   RESOURCE FORM", 11, MUTED))
+	kit_resource_picker = OptionButton.new()
+	kit_resource_picker.add_item("Surprise me")
+	for form in KitDesign.RESOURCE_FORMS:
+		kit_resource_picker.add_item(str(form).capitalize())
+	kit_resource_picker.item_selected.connect(func(_index): _mark_dirty())
+	kit_manual_controls.add_child(kit_resource_picker)
 	kit_brief.add_child(_label("DESIGN SEED", 11, MUTED))
 	kit_seed = SpinBox.new()
 	kit_seed.min_value = 0
@@ -535,14 +570,16 @@ func _sidebar(parent: Node) -> void:
 		if not updating_controls:
 			kit_seed_lock.button_pressed = true
 			_mark_dirty())
+	kit_seed.get_line_edit().text_changed.connect(func(_text): kit_seed_draft = true)
 	kit_brief.add_child(kit_seed)
 	kit_seed_lock = CheckBox.new()
 	kit_seed_lock.text = "Keep seed"
 	kit_seed_lock.add_theme_font_size_override("font_size", 12)
 	kit_seed_lock.toggled.connect(func(_pressed): _mark_dirty())
 	kit_brief.add_child(kit_seed_lock)
-	kit_brief.add_child(_wrapped("Generate explores new shapes and compositions. Keep the seed to repeat a design.", 11, MUTED))
-	kit_brief.add_child(_wrapped("Layered frames · carved ornaments\nHealth & mana bars · inventory · icons\nDrawn offline on your PC.", 11, MUTED))
+	kit_brief.add_child(_wrapped("Each surprise explores a new art direction, creature, map outline, and resource form. Keep the seed to repeat it.", 11, MUTED))
+	kit_brief.add_child(_wrapped("Original creature artwork + procedural drawing. Everything runs offline.", 11, MUTED))
+	_sync_kit_brief_controls()
 	body = outer
 	body.add_child(_label("TARGET RESOLUTION", 11, MUTED))
 	resolution_picker = OptionButton.new()
@@ -832,21 +869,31 @@ func _set_creation_mode(index: int) -> void:
 
 func _generate_kit() -> void:
 	art_update_timer.stop()
-	kit_seed.apply()
-	var previous_layout: int = int(KitDesign.recipe(current_config).layout) if current_config.get("mode", "hud") == "kit" else -1
-	current_config = Kit.make_config(Kit.STYLES[kit_style_picker.selected])
-	current_config.kit.design = KitDesign.FAMILIES[kit_design_picker.selected]
+	if kit_seed_draft:
+		kit_seed.apply()
+		kit_seed_draft = false
 	var next_seed: int = int(kit_seed.value)
+	var next_config: Dictionary = _kit_config_for_seed(next_seed)
 	if not kit_seed_lock.button_pressed:
 		next_seed = randi_range(0, 2147483646)
-		while next_seed == int(kit_seed.value) or posmod(next_seed, KitDesign.COMPOSITIONS.size()) == previous_layout:
+		next_config = _kit_config_for_seed(next_seed)
+		while next_seed == int(kit_seed.value) or not _fresh_kit_combination(next_config):
 			next_seed = randi_range(0, 2147483646)
+			next_config = _kit_config_for_seed(next_seed)
 	kit_seed.set_value_no_signal(next_seed)
-	current_config.kit.seed = next_seed
-	current_config.kit.material = Kit.MATERIALS[kit_material_picker.selected]
-	current_config.kit.ornaments = Kit.ORNAMENTS[kit_ornament_picker.selected]
-	current_config.accent = KitDesign.suggested_accent(current_config)
-	current_config.resolution = [Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(1280, 720)][resolution_picker.selected]
+	current_config = next_config
+	recent_kit_signatures.append(KitDesign.generation_signature(current_config))
+	if recent_kit_signatures.size() > 12:
+		recent_kit_signatures.pop_front()
+	if kit_surprise.button_pressed:
+		kit_style_picker.select(Kit.STYLES.find(current_config.style))
+		kit_design_picker.select(KitDesign.FAMILIES.find(current_config.kit.design))
+		kit_material_picker.select(Kit.MATERIALS.find(current_config.kit.material))
+		kit_ornament_picker.select(Kit.ORNAMENTS.find(current_config.kit.ornaments))
+		kit_map_picker.select(KitDesign.MAP_SHAPES.find(KitDesign.recipe(current_config).map_shape) + 1)
+		kit_resource_picker.select(KitDesign.RESOURCE_FORMS.find(KitDesign.recipe(current_config).stat_presentation) + 1)
+	var design: Dictionary = KitDesign.recipe(current_config)
+	kit_roll_summary.text = "%s\n%s · %s\n%s map · %s resources" % [current_config.style, design.family, current_config.kit.material, str(design.map_shape).capitalize(), str(design.stat_presentation).capitalize()]
 	layout_history.clear_history()
 	preview.selected_element = ""
 	updating_controls = true
@@ -868,6 +915,49 @@ func _generate_kit() -> void:
 	dirty_label.modulate = Color.WHITE
 	status_label.text = "%s · %s · seed %d · Export saves all three kit pages." % [current_config.style, KitDesign.description(current_config), next_seed]
 
+func _sync_kit_brief_controls() -> void:
+	if is_instance_valid(kit_manual_controls):
+		kit_manual_controls.visible = not kit_surprise.button_pressed
+	if is_instance_valid(kit_roll_summary):
+		kit_roll_summary.visible = kit_surprise.button_pressed
+	for picker in [kit_style_picker, kit_design_picker, kit_material_picker, kit_ornament_picker, kit_map_picker, kit_resource_picker]:
+		if is_instance_valid(picker):
+			picker.disabled = kit_surprise.button_pressed
+
+func _kit_config_for_seed(seed_value: int) -> Dictionary:
+	var brief: Dictionary = KitDesign.surprise_brief(seed_value) if kit_surprise.button_pressed else {
+		"style": Kit.STYLES[kit_style_picker.selected], "design": KitDesign.FAMILIES[kit_design_picker.selected],
+		"material": Kit.MATERIALS[kit_material_picker.selected], "ornaments": Kit.ORNAMENTS[kit_ornament_picker.selected]}
+	var config: Dictionary = Kit.make_config(str(brief.style))
+	config.kit.seed = seed_value
+	config.kit.surprise = kit_surprise.button_pressed
+	config.kit.design = brief.design
+	config.kit.material = brief.material
+	config.kit.ornaments = brief.ornaments
+	config.kit.map_shape = "Surprise me" if kit_surprise.button_pressed or kit_map_picker.selected == 0 else KitDesign.MAP_SHAPES[kit_map_picker.selected - 1]
+	config.kit.stat_presentation = "Surprise me" if kit_surprise.button_pressed or kit_resource_picker.selected == 0 else KitDesign.RESOURCE_FORMS[kit_resource_picker.selected - 1]
+	config.accent = KitDesign.suggested_accent(config)
+	config.resolution = [Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(1280, 720)][resolution_picker.selected]
+	return config
+
+func _fresh_kit_combination(candidate: Dictionary) -> bool:
+	if current_config.get("mode", "hud") != "kit":
+		return true
+	var before: Dictionary = KitDesign.recipe(current_config)
+	var after: Dictionary = KitDesign.recipe(candidate)
+	if before.layout == after.layout:
+		return false
+	if (kit_surprise.button_pressed or kit_map_picker.selected == 0) and before.map_shape == after.map_shape:
+		return false
+	if (kit_surprise.button_pressed or kit_resource_picker.selected == 0) and before.stat_presentation == after.stat_presentation:
+		return false
+	if kit_surprise.button_pressed:
+		if candidate.style == current_config.style or before.motif == after.motif:
+			return false
+		if KitDesign.generation_signature(candidate) in recent_kit_signatures:
+			return false
+	return true
+
 func _regenerate_selected() -> void:
 	if ai_busy or current_config.get("mode", "hud") != "kit":
 		return
@@ -884,16 +974,24 @@ func _regenerate_selected() -> void:
 	var had_override = overrides.has(component)
 	var previous = int(overrides.get(component, 0))
 	var next = randi_range(1, 2147483647)
-	var old_silhouette: int = int(KitDesign.recipe(current_config, component).silhouette_index)
+	var previous_recipe: Dictionary = KitDesign.recipe(current_config, component)
 	var candidate: Dictionary = current_config.duplicate(true)
 	candidate.kit.component_seeds[component] = next
-	while next == previous or int(KitDesign.recipe(candidate, component).silhouette_index) == old_silhouette:
+	while next == previous or not _different_component_shape(candidate, component, previous_recipe):
 		next = (next % 2147483646) + 1
 		candidate.kit.component_seeds[component] = next
 	layout_history.create_action("Regenerate " + component)
 	layout_history.add_do_method(_apply_component_seed.bind(component, next, true))
 	layout_history.add_undo_method(_apply_component_seed.bind(component, previous, had_override))
 	layout_history.commit_action()
+
+func _different_component_shape(candidate: Dictionary, component: String, previous: Dictionary) -> bool:
+	var changed: Dictionary = KitDesign.recipe(candidate, component)
+	if component == "Minimap" and str(candidate.kit.get("map_shape", "Surprise me")).to_lower() not in KitDesign.MAP_SHAPES:
+		return previous.map_shape != changed.map_shape
+	if component in ["Health", "Mana"] and str(candidate.kit.get("stat_presentation", "Surprise me")).to_lower() not in KitDesign.RESOURCE_FORMS:
+		return previous.stat_presentation != changed.stat_presentation
+	return previous.silhouette_index != changed.silhouette_index
 
 func _apply_component_seed(component: String, seed_value: int, enabled: bool) -> void:
 	if enabled:

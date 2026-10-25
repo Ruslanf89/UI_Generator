@@ -322,7 +322,7 @@ Right-click an instance in the Scene dock and enable Editable Children. Native
 buttons, labels, bars, and panels live under Canvas/Viewport/Design/Elements.
 Edit labels with the Text property. Connect native Button pressed signals to
 your game scripts; menu actions and sample values are not wired to gameplay.
-Change ProgressBar values from gameplay code for health, mana, and other stats.
+Change Range values from gameplay code for health, mana, and other stats.
 
 kit_theme.tres is shared by all three pages. Local Theme Overrides hold generated
 button states, panel frames, and bar fills. Their StyleBoxTexture resources and

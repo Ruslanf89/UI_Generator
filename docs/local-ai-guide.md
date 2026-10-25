@@ -125,8 +125,9 @@ if you need help with its workflow screen. SDXL Base can run without a refiner.
 ## 5. Generate AI artwork in UI Forge
 
 1. Leave ComfyUI running and open UI Forge.
-2. At the top of **Design Brief**, select **Fantasy UI kit**. Choose the kit
-   art style, design language, material, and decoration, then click
+2. At the top of **Design Brief**, select **Fantasy UI kit**. Leave **Surprise
+   everything** on to roll a brief, or uncheck it to choose the art style,
+   design language, material, decoration, map shape, and resource form. Click
    **Generate complete kit**.
    This creates the editable Menu/HUD/Components layout. **Keep seed** can
    reproduce the initial procedural layout; full generation resets later edits
@@ -170,7 +171,7 @@ or cancelled batch keeps the previously accepted artwork and arrangement.
 running in ComfyUI may still finish. Other ComfyUI jobs are not interrupted.
 
 UI Forge uses the model to create pictures. Layouts, button text, Labels, and
-ProgressBars remain editable Godot controls. SDXL does not connect menu actions
+resource displays remain editable Godot controls. SDXL does not connect menu actions
 or game statistics to gameplay. The app asks for artwork without lettering so
 that real editable text can be placed above it.
 
@@ -188,7 +189,8 @@ that real editable text can be placed above it.
 The prompt controls the colors of AI images. The accent picker is disabled
 while AI artwork is active. Describe a different palette and
 generate again to change them. To apply a new kit art style, design language,
-material, or decoration level, export the current result first, generate the new kit, and then
+material, decoration, map shape, or resource form, export the current result
+first, generate the new kit, and then
 request its AI artwork.
 
 UI Forge remembers the local address, model choice, and prompt on your PC for

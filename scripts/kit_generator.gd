@@ -3,7 +3,8 @@ extends RefCounted
 
 const Art = preload("res://scripts/kit_art.gd")
 const Design = preload("res://scripts/kit_design.gd")
-const STYLES = ["Illustrated fantasy", "Medieval pixel"]
+const Shapes = preload("res://scripts/kit_shapes.gd")
+const STYLES = Design.ART_STYLES
 const PAGES = ["Menu", "HUD", "Components"]
 const MATERIALS = ["Wood", "Stone", "Parchment"]
 const ORNAMENTS = ["Simple", "Balanced", "Rich"]
@@ -11,6 +12,7 @@ const DESIGNS = Design.FAMILIES
 const CANVAS = Vector2(1280, 720)
 const MIN_ELEMENT_SCALE = 0.35
 const MAX_ELEMENT_SCALE = 3.0
+static var contour_texture_cache: Dictionary = {}
 
 static func make_config(style: String = STYLES[0]) -> Dictionary:
 	return {"mode": "kit", "genre": "Fantasy kit", "style": style,
@@ -105,11 +107,12 @@ static func _menu_geometry(config: Dictionary) -> Dictionary:
 			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 30, banner_width, rng.randi_range(108, 124))
 			menu_rect = Rect2(left, top, column, height)
 			profile_rect = Rect2(left + column + gutter, top, spread - column - gutter, height)
-			var available = height - 172.0
-			var gap = float(rng.randi_range(12, 18))
-			var button_height = minf(float(rng.randi_range(58, 66)), floorf((available - 3.0 * gap) / 4.0))
+			var button_top = _header_height(menu_rect.size) + 50
+			var available = height - button_top - 53
+			var gap = float(rng.randi_range(10, 14))
+			var button_height = minf(float(rng.randi_range(54, 60)), floorf((available - 3.0 * gap) / 4.0))
 			var inset = float(rng.randi_range(32, 40))
-			var first_y = top + 104 + floorf((available - button_height * 4 - gap * 3) / 2.0)
+			var first_y = top + button_top + floorf((available - button_height * 4 - gap * 3) / 2.0)
 			for i in 4:
 				buttons.append(Rect2(left + inset, first_y + i * (button_height + gap), column - inset * 2, button_height))
 		1: # Story sidebar: navigation is a tall left rail; the story leads right.
@@ -122,11 +125,12 @@ static func _menu_geometry(config: Dictionary) -> Dictionary:
 			menu_rect = Rect2(44, 42, column, 626)
 			var story_y = banner_rect.end.y + rng.randi_range(40, 52)
 			profile_rect = Rect2(story_x, story_y, story_width, 668.0 - story_y)
-			var gap = float(rng.randi_range(28, 44))
-			var available = menu_rect.size.y - 230.0
-			var button_height = minf(float(rng.randi_range(64, 78)), floorf((available - 3 * gap) / 4.0))
+			var gap = float(rng.randi_range(22, 34))
+			var button_top = _header_height(menu_rect.size) + 70
+			var available = menu_rect.size.y - button_top - 90
+			var button_height = minf(float(rng.randi_range(64, 72)), floorf((available - 3 * gap) / 4.0))
 			var inset = float(rng.randi_range(30, 36))
-			var first_y = 172 + floorf((available - button_height * 4 - gap * 3) / 2.0)
+			var first_y = menu_rect.position.y + button_top + floorf((available - button_height * 4 - gap * 3) / 2.0)
 			for i in 4:
 				buttons.append(Rect2(44 + inset, first_y + i * (button_height + gap), column - inset * 2, button_height))
 		2: # Command grid: wide character summary above a two-column action tray.
@@ -172,21 +176,23 @@ static func _menu(root: Control, config: Dictionary) -> void:
 	_banner(root, config, "TitleBanner", "REALMBOUND", "A TALE OF EMBERS & ANCIENT MAGIC", banner_rect)
 	var menu = _panel(root, config, "MenuPanel", menu_rect)
 	var heading = Rect2(30, 27, menu.size.x - 60, 42)
-	var footer = Rect2(28, menu.size.y - 51, menu.size.x - 56, 26)
+	var footer = Rect2(28, menu.size.y - 39, menu.size.x - 56, 26)
 	var rule = Rect2(50, 83, menu.size.x - 100, 2)
-	if layout == 1:
-		heading.position.y = 36
-		rule.position.y = 101
+	if layout < 2:
+		heading.position.y = _header_height(menu.size) + 3
+		heading.size.y = 34
+		rule.position.y = heading.end.y + 3
 	elif layout == 2:
 		heading = Rect2(30, 13, 330, 34)
-		footer = Rect2(418, 20, menu.size.x - 450, 24)
+		footer = Rect2(menu.size.x - 320, 20, 286, 24)
 		rule = Rect2(34, 55, menu.size.x - 68, 2)
 	elif layout == 3:
 		heading = Rect2(30, 15, menu.size.x - 60, 35)
 		rule = Rect2(52, 60, menu.size.x - 104, 2)
 		footer.position.y = menu.size.y - 38
 	_label(menu, "Heading", "Your adventure", heading, 26 if layout > 1 else 28, _ink(config), true)
-	_divider(menu, config, rule)
+	if layout != 2:
+		_divider(menu, config, rule)
 	for i in range(4):
 		var title: String = ["Continue", "New journey", "Settings", "Exit game"][i]
 		var node_name: String = ["ContinueButton", "NewJourneyButton", "SettingsButton", "ExitButton"][i]
@@ -216,11 +222,11 @@ static func _profile_content(profile: Panel, config: Dictionary, layout: int) ->
 			centered = true
 		1:
 			crest = Rect2(42, 90, 150, 150)
-			name_rect = Rect2(236, 38, 526, 48)
-			class_rect = Rect2(238, 91, 520, 30)
-			quest_rect = Rect2(232, 222, 534, 184)
-			gold_at = Vector2(238, 154)
-			shard_at = Vector2(500, 154)
+			name_rect = Rect2(236, 116, 526, 40)
+			class_rect = Rect2(238, 160, 520, 28)
+			quest_rect = Rect2(232, 266, 534, 142)
+			gold_at = Vector2(238, 204)
+			shard_at = Vector2(500, 204)
 		2:
 			crest = Rect2(34, 51, 132, 132)
 			name_rect = Rect2(200, 36, 420, 45)
@@ -233,7 +239,8 @@ static func _profile_content(profile: Panel, config: Dictionary, layout: int) ->
 			name_rect = Rect2(156, 25, 390, 40)
 			class_rect = Rect2(158, 68, 388, 28)
 			quest_rect = Rect2(154, 110, 388, 76)
-	_icon(profile, config, "CharacterPanel", "Crest", "icon_shield", crest)
+	var crest_node = _icon(profile, config, "CharacterPanel", "Crest", "icon_shield", crest)
+	crest_node.visible = layout != 0
 	_label(profile, "Name", "Elara, the Wayfarer", name_rect, 26 if layout == 3 else 28, _ink(config), centered)
 	_label(profile, "Class", "LEVEL 12  /  SPELLBLADE", class_rect, 16, _muted(config), centered)
 	if layout != 3:
@@ -287,16 +294,16 @@ static func _hud_geometry(config: Dictionary) -> Dictionary:
 		0: # Classic corner HUD with a low horizontal hotbar.
 			var banner_width = float(rng.randi_range(400, 500))
 			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 28, banner_width, rng.randi_range(84, 100))
-			var stat_width = float(rng.randi_range(348, 394))
-			var stat_height = float(rng.randi_range(76, 88))
-			var stat_gap = float(rng.randi_range(10, 18))
+			var stat_width = float(rng.randi_range(350, 400))
+			var stat_height = float(rng.randi_range(148, 164))
+			var stat_gap = float(rng.randi_range(14, 22))
 			health_rect = Rect2(44, 686 - stat_height * 2 - stat_gap, stat_width, stat_height)
 			mana_rect = Rect2(44, 686 - stat_height, stat_width, stat_height)
 			currency_rect = Rect2(44, 34, rng.randi_range(232, 264), rng.randi_range(64, 74))
-			var map_size = float(rng.randi_range(218, 250))
-			map_rect = Rect2(1236 - map_size, 34, map_size, map_size + 4)
+			var map_size = float(rng.randi_range(264, 292))
+			map_rect = Rect2(1236 - map_size, 32, map_size, rng.randi_range(310, 328))
 			var objective_width = float(rng.randi_range(300, 328))
-			objective_rect = Rect2(1236 - objective_width, map_rect.end.y + rng.randi_range(32, 44), objective_width, rng.randi_range(188, 214))
+			objective_rect = Rect2(1236 - objective_width, map_rect.end.y + 26, objective_width, rng.randi_range(178, 204))
 			quest_rect = Rect2(1052, 630, 184, 54)
 			var slot = float(rng.randi_range(74, 82))
 			var gap = float(rng.randi_range(10, 20))
@@ -305,51 +312,53 @@ static func _hud_geometry(config: Dictionary) -> Dictionary:
 			for i in 4:
 				abilities.append(Rect2(first_x + i * (slot + gap), 686 - slot, slot, slot))
 		1: # Explorer: health and mana balance the two bottom corners.
-			var banner_width = float(rng.randi_range(460, 490))
-			banner_rect = Rect2(roundf((CANVAS.x - banner_width) / 2.0), 32, banner_width, rng.randi_range(96, 110))
-			var stat_width = float(rng.randi_range(328, 364))
-			var stat_height = float(rng.randi_range(80, 94))
+			var stat_width = float(rng.randi_range(348, 380))
+			var stat_height = float(rng.randi_range(148, 164))
 			health_rect = Rect2(44, 686 - stat_height, stat_width, stat_height)
 			mana_rect = Rect2(1236 - stat_width, 686 - stat_height, stat_width, stat_height)
-			var map_size = float(rng.randi_range(226, 264))
-			map_rect = Rect2(44, 42, map_size, map_size + 2)
-			currency_rect = Rect2(44, map_rect.end.y + 30, map_size, 68)
-			var objective_width = float(rng.randi_range(300, 340))
-			objective_rect = Rect2(1236 - objective_width, 44, objective_width, rng.randi_range(200, 230))
+			var map_size = float(rng.randi_range(264, 292))
+			map_rect = Rect2(44, 32, map_size, rng.randi_range(310, 328))
+			currency_rect = Rect2(44, map_rect.end.y + 24, map_size, 68)
+			var objective_width = float(rng.randi_range(320, 350))
+			objective_rect = Rect2(1236 - objective_width, 36, objective_width, rng.randi_range(188, 220))
 			quest_rect = Rect2(1052, objective_rect.end.y + 28, 184, 54)
+			var corridor_left = map_rect.end.x + 30
+			var corridor_width = objective_rect.position.x - 30 - corridor_left
+			var banner_width = minf(float(rng.randi_range(430, 480)), corridor_width)
+			banner_rect = Rect2(corridor_left + floorf((corridor_width - banner_width) / 2.0), 32, banner_width, rng.randi_range(96, 110))
 			var slot = float(rng.randi_range(74, 82))
 			var gap = float(rng.randi_range(12, 20))
 			var first_x = roundf((CANVAS.x - (slot * 4 + gap * 3)) / 2.0)
 			for i in 4:
 				abilities.append(Rect2(first_x + i * (slot + gap), 686 - slot, slot, slot))
 		2: # Tactical: upper-left resources and a vertical right ability rail.
-			var stat_width = float(rng.randi_range(336, 392))
-			var stat_height = float(rng.randi_range(78, 86))
-			health_rect = Rect2(44, 44, stat_width, stat_height)
+			var stat_width = float(rng.randi_range(350, 394))
+			var stat_height = float(rng.randi_range(148, 160))
+			health_rect = Rect2(44, 32, stat_width, stat_height)
 			mana_rect = Rect2(44, health_rect.end.y + rng.randi_range(14, 22), stat_width, stat_height)
-			var map_size = float(rng.randi_range(224, 252))
-			map_rect = Rect2(1236 - map_size, 44, map_size, map_size + 8)
+			var map_size = float(rng.randi_range(270, 292))
+			map_rect = Rect2(1236 - map_size, 32, map_size, rng.randi_range(304, 318))
 			var banner_x = health_rect.end.x + 44
-			var banner_width = minf(float(rng.randi_range(432, 492)), map_rect.position.x - banner_x - 40)
+			var banner_width = minf(float(rng.randi_range(400, 470)), map_rect.position.x - banner_x - 30)
 			banner_rect = Rect2(banner_x, 34, banner_width, rng.randi_range(88, 104))
 			var currency_width = float(rng.randi_range(236, 264))
 			currency_rect = Rect2(roundf((CANVAS.x - currency_width) / 2.0), 598, currency_width, rng.randi_range(68, 78))
-			objective_rect = Rect2(44, mana_rect.end.y + rng.randi_range(28, 36), rng.randi_range(310, 340), rng.randi_range(190, 212))
+			objective_rect = Rect2(44, mana_rect.end.y + 24, rng.randi_range(310, 340), rng.randi_range(174, 190))
 			quest_rect = Rect2(44, 612, 210, 56)
-			var slot = float(rng.randi_range(72, 80))
-			var first_y = map_rect.end.y + 24
-			var gap = minf(float(rng.randi_range(8, 14)), floorf((686 - first_y - slot * 4) / 3.0))
+			var slot = float(rng.randi_range(64, 68))
+			var first_y = map_rect.end.y + 22
+			var gap = minf(float(rng.randi_range(10, 16)), floorf((686 - first_y - slot * 4) / 3.0))
 			for i in 4:
 				abilities.append(Rect2(1236 - slot, first_y + i * (slot + gap), slot, slot))
 		_: # Cinematic: top-row bars, a lower map, and a compact 2 x 2 hotbar.
 			var stat_width = float(rng.randi_range(316, 350))
-			var stat_height = float(rng.randi_range(78, 90))
+			var stat_height = float(rng.randi_range(148, 164))
 			var stat_gap = float(rng.randi_range(24, 40))
 			health_rect = Rect2(1236 - stat_width * 2 - stat_gap, 38, stat_width, stat_height)
 			mana_rect = Rect2(1236 - stat_width, 38, stat_width, stat_height)
 			banner_rect = Rect2(44, 34, health_rect.position.x - 76, rng.randi_range(88, 104))
-			var map_width = float(rng.randi_range(226, 254))
-			var map_height = float(rng.randi_range(234, 262))
+			var map_width = float(rng.randi_range(264, 288))
+			var map_height = float(rng.randi_range(304, 320))
 			map_rect = Rect2(44, 686 - map_height, map_width, map_height)
 			currency_rect = Rect2(map_rect.end.x + 24, 618, rng.randi_range(200, 220), 68)
 			var objective_width = float(rng.randi_range(300, 328))
@@ -381,35 +390,54 @@ static func _hud(root: Control, config: Dictionary) -> void:
 	var purse = _panel(root, config, "Currency", currency_rect)
 	_icon(purse, config, "Currency", "Coin", "icon_coin", Rect2(16, 13, 42, 42))
 	_label(purse, "Value", "1,240", Rect2(76, 12, purse.size.x - 96, 42), 28)
-	var map = _panel(root, config, "Minimap", map_rect)
-	_label(map, "Title", "WHISPERING WOODS", Rect2(18, 15, map.size.x - 36, 25), 13, _muted(config), true)
-	var content = Control.new()
+	var map_recipe = Design.recipe(config, "Minimap", "map_frame")
+	var map_shape = str(map_recipe.get("map_shape", "circle"))
+	var map = _panel(root, config, "Minimap", map_rect, "map_frame")
+	map.set_meta("map_shape", map_shape)
+	var aperture = Shapes.map_rect(map.size)
+	var content = TextureRect.new()
 	content.name = "MapContent"
-	content.position = Vector2(22, 48)
-	content.size = Vector2(190, 153)
-	content.scale = (map.size - Vector2(44, 86)) / content.size
-	content.clip_contents = true
+	content.position = aperture.position
+	content.size = aperture.size
+	content.texture = Shapes.mask_texture(aperture.size, map_shape, _pixel(config))
+	content.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	content.stretch_mode = TextureRect.STRETCH_SCALE
+	content.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.set_meta("map_shape", map_shape)
 	map.add_child(content)
-	_map_landmark(content, "River", PackedVector2Array([Vector2(-8, 18), Vector2(56, 40), Vector2(74, 91), Vector2(134, 116), Vector2(150, 160)]), Color("4c8393", 0.85), 12)
-	_map_landmark(content, "Road", PackedVector2Array([Vector2(1, 125), Vector2(42, 112), Vector2(72, 70), Vector2(128, 61), Vector2(187, 16)]), Color("ba9b64", 0.8), 5)
+	var world = Control.new()
+	world.name = "World"
+	world.size = Vector2(190, 153)
+	world.scale = aperture.size / world.size
+	world.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(world)
+	var ground = ColorRect.new()
+	ground.name = "Terrain"
+	ground.size = world.size
+	ground.color = Color("526548") if _light(config) else Color("293f35")
+	ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	world.add_child(ground)
+	_map_landmark(world, "River", PackedVector2Array([Vector2(-8, 18), Vector2(56, 40), Vector2(74, 91), Vector2(134, 116), Vector2(150, 160)]), Color("4c8393", 0.85), 12)
+	_map_landmark(world, "Road", PackedVector2Array([Vector2(1, 125), Vector2(42, 112), Vector2(72, 70), Vector2(128, 61), Vector2(187, 16)]), Color("ba9b64", 0.8), 5)
 	for i in range(11):
 		var tree = Polygon2D.new()
 		tree.name = "Tree%d" % (i + 1)
 		tree.polygon = PackedVector2Array([Vector2(0, 17), Vector2(8, 0), Vector2(17, 17)])
 		tree.position = Vector2(12 + (i * 43) % 158, 8 + (i * 31) % 112)
 		tree.color = Color("47794b") if _light(config) else Color("6b8a59")
-		content.add_child(tree)
-	_icon(content, config, "Minimap", "Player", "icon_arrow", Rect2(84, 75, 27, 27))
-	_icon(content, config, "Minimap", "QuestMarker", "icon_star", Rect2(144, 16, 25, 25))
-	_label(map, "Compass", "N   ·   E   ·   S   ·   W", Rect2(18, map.size.y - 33, map.size.x - 36, 20), 12, _muted(config), true)
+		world.add_child(tree)
+	_icon(world, config, "Minimap", "Player", "icon_arrow", Rect2(84, 75, 27, 27))
+	_icon(world, config, "Minimap", "QuestMarker", "icon_star", Rect2(144, 16, 25, 25))
+	_label(map, "Title", "WHISPERING WOODS", Rect2(18, map.size.y - 28, map.size.x - 36, 20), 12, _muted(config), true)
+	_label(map, "Compass", "N", Rect2(map.size.x / 2.0 - 12, aperture.position.y + 3, 24, 23), 13, _ink(config), true)
 	var objective = _panel(root, config, "Objective", objective_rect)
 	_icon(objective, config, "Objective", "Scroll", "icon_scroll", Rect2(20, 19, 38, 38))
 	_label(objective, "Title", "A light in the dark", Rect2(67, 22, objective.size.x - 90, 33), 18 if _pixel(config) else 20)
 	_divider(objective, config, Rect2(24, 70, objective.size.x - 48, 2))
-	var description = _label(objective, "Description", "Find the ancient sanctuary", Rect2(26, 83, objective.size.x - 52, 62), 20)
+	var description = _label(objective, "Description", "Find the ancient sanctuary", Rect2(26, 81, objective.size.x - 52, 46), 18)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_label(objective, "Progress", "Lanterns lit    2 / 3", Rect2(26, objective.size.y - 49, objective.size.x - 52, 27), 17, _muted(config))
+	_label(objective, "Progress", "Lanterns lit    2 / 3", Rect2(26, objective.size.y - 40, objective.size.x - 52, 25), 16, _muted(config))
 	var icons = ["icon_sword", "icon_shield", "icon_potion", "icon_mana"]
 	for i in range(4):
 		var node_name = "Ability%d" % (i + 1)
@@ -422,7 +450,8 @@ static func _hud(root: Control, config: Dictionary) -> void:
 static func _components(root: Control, config: Dictionary) -> void:
 	_banner(root, config, "TitleBanner", "THE ADVENTURER'S KIT", "ONE SEED  /  A COORDINATED COLLECTION", Rect2(322, 24, 636, 104))
 	var panel = _panel(root, config, "SamplePanel", Rect2(44, 158, 348, 364))
-	_icon(panel, config, "SamplePanel", "Crest", "icon_shield", Rect2(132, 27, 84, 84))
+	var crest = _icon(panel, config, "SamplePanel", "Crest", "icon_shield", Rect2(132, 27, 84, 84))
+	crest.hide()
 	_label(panel, "Title", "Guild of the Dawn", Rect2(22, 125, 304, 38), 25, _ink(config), true)
 	_label(panel, "Subtitle", "An editable framed panel", Rect2(22, 170, 304, 30), 16, _muted(config), true)
 	_divider(panel, config, Rect2(36, 220, 276, 2))
@@ -435,18 +464,19 @@ static func _components(root: Control, config: Dictionary) -> void:
 		var title: String = ["Begin adventure", "Hovered", "Pressed", "Unavailable"][i]
 		_button(root, config, node_name, title, Rect2(438, 166 + i * 89, 300, 64), state)
 	var inventory = _panel(root, config, "Inventory", Rect2(784, 158, 452, 364))
-	_label(inventory, "Title", "Inventory", Rect2(28, 17, 300, 40), 27)
-	_label(inventory, "Capacity", "15 / 30", Rect2(298, 25, 124, 27), 16, _muted(config))
-	_divider(inventory, config, Rect2(26, 69, 400, 2))
+	var header = _header_height(inventory.size)
+	_label(inventory, "Title", "Inventory", Rect2(28, header + 9, 280, 36), 25)
+	_label(inventory, "Capacity", "15 / 30", Rect2(298, header + 15, 124, 27), 16, _muted(config))
+	_divider(inventory, config, Rect2(26, header + 52, 400, 2))
 	var items = ["icon_sword", "icon_shield", "icon_potion", "icon_bag", "icon_scroll", "icon_heart", "icon_mana", "icon_coin", "icon_gear"]
 	for i in range(15):
-		var slot = _nested_panel(inventory, config, "Inventory", "Slot%d" % (i + 1), Rect2(26 + (i % 5) * 81, 88 + (i / 5) * 82, 70, 70), "slot")
+		var slot = _nested_panel(inventory, config, "Inventory", "Slot%d" % (i + 1), Rect2(40 + (i % 5) * 79, header + 65 + (i / 5) * 65, 55, 55), "slot")
 		if i < items.size():
-			_icon(slot, config, "Inventory", "Icon", items[i], Rect2(13, 10, 44, 44))
+			_icon(slot, config, "Inventory", "Icon", items[i], Rect2(9, 6, 37, 37))
 			if i in [2, 6, 7]:
-				_label(slot, "Count", ["3", "8", "24"][[2, 6, 7].find(i)], Rect2(35, 46, 26, 18), 12, _ink(config), true)
-	_stat(root, config, "Health", "VITALITY", "icon_heart", Rect2(44, 562, 348, 90), float(config.get("health", 78)))
-	_stat(root, config, "Mana", "MANA", "icon_mana", Rect2(438, 562, 300, 90), float(config.get("mana", 62)))
+				_label(slot, "Count", ["3", "8", "24"][[2, 6, 7].find(i)], Rect2(29, 30, 24, 22), 12, _ink(config), true)
+	_stat(root, config, "Health", "VITALITY", "icon_heart", Rect2(44, 540, 348, 148), float(config.get("health", 78)))
+	_stat(root, config, "Mana", "MANA", "icon_mana", Rect2(438, 540, 300, 148), float(config.get("mana", 62)))
 	var icons = ["icon_sword", "icon_shield", "icon_potion", "icon_heart", "icon_gear", "icon_bag", "icon_arrow", "icon_star", "icon_coin", "icon_scroll", "icon_mana", "icon_close"]
 	for i in range(icons.size()):
 		var name = "Icon%d" % (i + 1)
@@ -487,27 +517,98 @@ static func _banner(root: Control, config: Dictionary, id: String, title: String
 	var title_size = 40 if rect.size.y > 100 else 29
 	if _pixel(config):
 		title_size -= 4
-	_label(panel, "Title", title, Rect2(25, rect.size.y * 0.16, rect.size.x - 50, rect.size.y * 0.47), title_size, _ink(config), true)
-	_label(panel, "Subtitle", subtitle, Rect2(25, rect.size.y * 0.62, rect.size.x - 50, rect.size.y * 0.23), 13 if _pixel(config) else 14, _muted(config), true)
+	var inset = minf(110, rect.size.y * 0.85)
+	var text_width = rect.size.x - inset * 2
+	var font = panel.get_theme_font("font", "Label")
+	var desired_width = font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x
+	if desired_width > text_width:
+		title_size = maxi(18, floori(title_size * text_width / desired_width))
+	_label(panel, "Title", title, Rect2(inset, rect.size.y * 0.16, text_width, rect.size.y * 0.47), title_size, _ink(config), true)
+	_label(panel, "Subtitle", subtitle, Rect2(inset, rect.size.y * 0.62, text_width, rect.size.y * 0.23), 13 if _pixel(config) else 14, _muted(config), true)
 	return panel
 
+static func _header_height(dimensions: Vector2) -> float:
+	return clampf(dimensions.y * 0.25, 80, 104) if dimensions.y > 300 else 0.0
+
 static func _stat(root: Control, config: Dictionary, id: String, title: String, icon_kind: String, rect: Rect2, value: float) -> Panel:
-	var panel = _panel(root, config, id, rect)
-	_icon(panel, config, id, "Emblem", icon_kind, Rect2(16, (rect.size.y - 48) / 2.0, 48, 48))
-	_label(panel, "Title", title, Rect2(78, 11, rect.size.x - 190, 23), 16, _muted(config))
-	var amount = _label(panel, "Amount", "%d / 100" % value, Rect2(rect.size.x - 115, 11, 94, 23), 16)
-	amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	var bar = ProgressBar.new()
-	bar.name = "Value"
-	bar.position = Vector2(78, 43 if rect.size.y < 85 else 48)
-	bar.size = Vector2(rect.size.x - 102, 18 if rect.size.y < 85 else 22)
-	bar.value = value
-	bar.show_percentage = false
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_theme_stylebox_override("background", _texture_style(config, bar.size, id, "bar_frame"))
-	bar.add_theme_stylebox_override("fill", _texture_style(config, bar.size, id, "fill_health" if id == "Health" else "fill_mana"))
-	panel.add_child(bar)
+	var recipe = Design.recipe(config, id, "stat_frame")
+	var presentation = str(recipe.get("stat_presentation", "bar"))
+	var panel = _panel(root, config, id, rect, "stat_frame")
+	panel.set_meta("stat_presentation", presentation)
+	var geometry = Shapes.stat_geometry(rect.size, presentation)
+	var reservoir: Rect2 = geometry.reservoir
+	var plaque: Rect2 = geometry.plaque
+	# The sculpted head owns the far-right end of the plaque. Native text stays
+	# in the quiet strip beside the reservoir, and values remain easy to read.
+	var text_width = maxf(56, plaque.size.x - 68)
+	_label(panel, "Title", title, Rect2(plaque.position + Vector2(2, 7), Vector2(text_width, 27)), 18, _muted(config))
+	if presentation in ["orb", "vial"]:
+		var liquid = TextureProgressBar.new()
+		liquid.name = "Value"
+		liquid.nine_patch_stretch = true
+		liquid.position = reservoir.position
+		liquid.size = reservoir.size
+		liquid.fill_mode = TextureProgressBar.FILL_BOTTOM_TO_TOP
+		liquid.texture_under = _contour_texture(Art.texture(config, reservoir.size, id, "reservoir_empty"), reservoir.size, presentation, _pixel(config))
+		liquid.texture_progress = _contour_texture(Art.texture(config, reservoir.size, id, "reservoir_health" if id == "Health" else "reservoir_mana"), reservoir.size, presentation, _pixel(config))
+		liquid.value = value
+		liquid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(liquid)
+	else:
+		var emblem_size = minf(96, floorf(reservoir.size.x * 0.75))
+		_icon(panel, config, id, "Emblem", icon_kind, Rect2(reservoir.position + Vector2((reservoir.size.x - emblem_size) / 2.0, 8), Vector2(emblem_size, emblem_size)))
+		var bar = ProgressBar.new()
+		bar.name = "Value"
+		# Run the gauge under the creature's chin rather than stopping in the
+		# narrow text column. Its full plaque width reads clearly in the preview.
+		var bar_y = rect.size.y * 0.5 + 56
+		bar.position = Vector2(plaque.position.x + 2, bar_y)
+		bar.size = Vector2(plaque.size.x - 4, minf(18, rect.size.y - bar_y - 6))
+		bar.value = value
+		bar.show_percentage = false
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.add_theme_stylebox_override("background", _texture_style(config, bar.size, id, "bar_frame"))
+		bar.add_theme_stylebox_override("fill", _texture_style(config, bar.size, id, "fill_health" if id == "Health" else "fill_mana"))
+		panel.add_child(bar)
+		if presentation == "segmented":
+			for i in range(1, 8):
+				var gap = ColorRect.new()
+				gap.name = "Segment%d" % i
+				gap.position = Vector2(roundf(bar.size.x * i / 8.0), 4)
+				gap.size = Vector2(2, bar.size.y - 8)
+				gap.color = Color("191e24")
+				gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				bar.add_child(gap)
+	var amount_y = reservoir.position.y + reservoir.size.y * (0.57 if presentation in ["orb", "vial"] else 0.72)
+	var amount = _label(panel, "Amount", "%d / 100" % value, Rect2(reservoir.position.x, amount_y, reservoir.size.x, 27), 17, Color("fff2d9"), true)
+	amount.add_theme_color_override("font_shadow_color", Color("11101a", 0.95))
+	amount.add_theme_constant_override("shadow_offset_x", 1)
+	amount.add_theme_constant_override("shadow_offset_y", 1)
 	return panel
+
+static func _contour_texture(source: ImageTexture, dimensions: Vector2, shape: String, pixel: bool) -> ImageTexture:
+	if source == null:
+		return null
+	var key = "%d/%s/%s/%s" % [source.get_instance_id(), dimensions, shape, pixel]
+	if contour_texture_cache.has(key):
+		return contour_texture_cache[key]
+	if contour_texture_cache.size() >= 128:
+		contour_texture_cache.clear()
+	var image = source.get_image()
+	var mask = Shapes.mask_texture(dimensions, shape, pixel).get_image()
+	image.convert(Image.FORMAT_RGBA8)
+	mask.convert(Image.FORMAT_RGBA8)
+	if mask.get_size() != image.get_size():
+		mask.resize(image.get_width(), image.get_height(), Image.INTERPOLATE_NEAREST if pixel else Image.INTERPOLATE_LANCZOS)
+	var pixels = image.get_data()
+	var mask_pixels = mask.get_data()
+	for index in range(3, pixels.size(), 4):
+		pixels[index] = roundi(float(pixels[index]) * float(mask_pixels[index]) / 255.0)
+	var result = ImageTexture.create_from_image(Image.create_from_data(image.get_width(), image.get_height(), false, Image.FORMAT_RGBA8, pixels))
+	for metadata in source.get_meta_list():
+		result.set_meta(metadata, source.get_meta(metadata))
+	contour_texture_cache[key] = result
+	return result
 
 static func _panel(root: Control, config: Dictionary, id: String, rect: Rect2, kind: String = "panel") -> Panel:
 	var result = _nested_panel(root, config, id, id, rect, kind)

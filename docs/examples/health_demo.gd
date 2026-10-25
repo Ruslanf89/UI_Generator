@@ -1,7 +1,7 @@
 extends Node2D
 ## Attach to a Node2D Game with CanvasLayer > HUD and the Health component.
 
-@onready var health_bar: ProgressBar = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Value
+@onready var health_bar: Range = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Value
 @onready var health_text: Label = $CanvasLayer/HUD/Canvas/Viewport/Design/Elements/Health/Amount
 
 var maximum_health: float = 100.0
